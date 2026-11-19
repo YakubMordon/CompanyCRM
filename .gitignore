@@ -1,0 +1,71 @@
+# .NET / Visual Studio / Build Artifacts
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Bb]uild/
+bld/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+.vs/
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# .NET User Secrets and Lock Files
+project.lock.json
+project.assets.json
+*.nuget.props
+*.nuget.targets
+
+# Test & Coverage Results
+TestResults/
+coverage/
+*.trx
+*.coverage
+*.coveragexml
+
+# .NET Aspire Artifacts
+.aspire/
+
+# Node.js / Vite / React (companycrm-web)
+node_modules/
+dist/
+dist-ssr/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.vite/
+
+# Database files (Dual-mode local SQLite fallback)
+*.db
+*.db-shm
+*.db-wal
+Data/*.db
+Data/*.db-shm
+Data/*.db-wal
+
+# OS Generated
+Thumbs.db
+[Ee]hthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+!.env.example
