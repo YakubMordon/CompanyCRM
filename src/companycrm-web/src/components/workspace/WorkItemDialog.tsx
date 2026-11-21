@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
@@ -12,6 +11,9 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
+import Tooltip from '@mui/material/Tooltip';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import InputAdornment from '@mui/material/InputAdornment';
 import Box from '@mui/material/Box';
 import {
   CreateWorkItemDto,
@@ -21,6 +23,9 @@ import {
   WorkItemType,
 } from '../../types';
 import { projectsApi } from '../../services/projectsApi';
+import { FormDialog } from '../common/FormDialog';
+import { workItemSchema, LIMITS } from '../../validation/schemas';
+import { getApiErrorMessage } from '../../validation/errorMessage';
 
 interface WorkItemDialogProps {
   open: boolean;
@@ -50,6 +55,13 @@ export const WorkItemDialog: React.FC<WorkItemDialogProps> = ({
   const [members, setMembers] = useState<ProjectMemberDto[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    title?: string;
+    description?: string;
+    sprintName?: string;
+    estimatedHours?: string;
+    storyPoints?: string;
+  }>({});
 
   useEffect(() => {
     if (projectId && open) {
@@ -83,12 +95,40 @@ export const WorkItemDialog: React.FC<WorkItemDialogProps> = ({
       setSprintName('Sprint 1');
     }
     setError(null);
+    setFieldErrors({});
   }, [itemToEdit, open]);
+
+  const validateFields = () => {
+    const hoursNum = estimatedHours.trim() ? parseFloat(estimatedHours) : undefined;
+    const pointsNum = storyPoints.trim() ? parseInt(storyPoints, 10) : undefined;
+
+    const result = workItemSchema.safeParse({
+      title,
+      description,
+      sprintName,
+      estimatedHours: hoursNum,
+      storyPoints: pointsNum,
+    });
+
+    if (!result.success) {
+      const errs: typeof fieldErrors = {};
+      for (const issue of result.error.issues) {
+        const field = issue.path[0] as keyof typeof fieldErrors;
+        if (field && !errs[field]) {
+          errs[field] = issue.message;
+        }
+      }
+      setFieldErrors(errs);
+      return false;
+    }
+
+    setFieldErrors({});
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) {
-      setError('Title is required.');
+    if (!validateFields()) {
       return;
     }
 
@@ -104,41 +144,46 @@ export const WorkItemDialog: React.FC<WorkItemDialogProps> = ({
         priority,
         assigneeId: assigneeId || null,
         reviewerId: reviewerId || null,
-        estimatedHours: estimatedHours ? parseFloat(estimatedHours) : null,
-        storyPoints: storyPoints ? parseInt(storyPoints, 10) : null,
+        estimatedHours: estimatedHours.trim() ? parseFloat(estimatedHours) : null,
+        storyPoints: storyPoints.trim() ? parseInt(storyPoints, 10) : null,
         sprintName: sprintName.trim() || null,
       };
 
       await onSubmit(dto, itemToEdit?.id);
       onClose();
     } catch (err: any) {
-      const detail = err?.response?.data?.detail || err?.message || 'Failed to save work item.';
-      setError(detail);
+      setError(getApiErrorMessage(err, 'Failed to save work item.'));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <FormDialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <form onSubmit={handleSubmit}>
         <DialogTitle sx={{ fontWeight: 700 }}>
           {itemToEdit ? `Edit Work Item: ${itemToEdit.code}` : 'Create New Work Item'}
         </DialogTitle>
-        <DialogContent dividers>
+        <DialogContent dividers sx={{ pt: 3 }}>
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
             </Alert>
           )}
 
-          <Grid container spacing={2}>
+          <Grid container spacing={2.5}>
             <Grid item xs={12}>
               <TextField
                 fullWidth
                 label="Title"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  if (fieldErrors.title) validateFields();
+                }}
+                error={Boolean(fieldErrors.title)}
+                helperText={fieldErrors.title || `${title.length}/${LIMITS.workItemTitleMax}`}
+                inputProps={{ maxLength: LIMITS.workItemTitleMax }}
                 required
                 autoFocus
               />
@@ -149,7 +194,13 @@ export const WorkItemDialog: React.FC<WorkItemDialogProps> = ({
                 fullWidth
                 label="Description"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  if (fieldErrors.description) validateFields();
+                }}
+                error={Boolean(fieldErrors.description)}
+                helperText={fieldErrors.description || `${description.length}/${LIMITS.workItemDescriptionMax}`}
+                inputProps={{ maxLength: LIMITS.workItemDescriptionMax }}
                 multiline
                 rows={3}
               />
@@ -192,7 +243,13 @@ export const WorkItemDialog: React.FC<WorkItemDialogProps> = ({
                 size="small"
                 label="Sprint Name"
                 value={sprintName}
-                onChange={(e) => setSprintName(e.target.value)}
+                onChange={(e) => {
+                  setSprintName(e.target.value);
+                  if (fieldErrors.sprintName) validateFields();
+                }}
+                error={Boolean(fieldErrors.sprintName)}
+                helperText={fieldErrors.sprintName || `${sprintName.length}/${LIMITS.sprintNameMax}`}
+                inputProps={{ maxLength: LIMITS.sprintNameMax }}
               />
             </Grid>
 
@@ -248,8 +305,22 @@ export const WorkItemDialog: React.FC<WorkItemDialogProps> = ({
                 type="number"
                 label="Estimated Hours"
                 value={estimatedHours}
-                onChange={(e) => setEstimatedHours(e.target.value)}
-                inputProps={{ min: 0, step: 0.5 }}
+                onChange={(e) => {
+                  setEstimatedHours(e.target.value);
+                  if (fieldErrors.estimatedHours) validateFields();
+                }}
+                error={Boolean(fieldErrors.estimatedHours)}
+                helperText={fieldErrors.estimatedHours}
+                inputProps={{ min: LIMITS.estimatedHoursMin, max: LIMITS.estimatedHoursMax, step: 0.5 }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Tooltip title="Expected total effort in hours (0 - 9999.99)">
+                        <InfoOutlinedIcon fontSize="small" sx={{ color: 'text.secondary', cursor: 'help' }} />
+                      </Tooltip>
+                    </InputAdornment>
+                  ),
+                }}
               />
             </Grid>
 
@@ -260,21 +331,43 @@ export const WorkItemDialog: React.FC<WorkItemDialogProps> = ({
                 type="number"
                 label="Story Points"
                 value={storyPoints}
-                onChange={(e) => setStoryPoints(e.target.value)}
-                inputProps={{ min: 0, step: 1 }}
+                onChange={(e) => {
+                  setStoryPoints(e.target.value);
+                  if (fieldErrors.storyPoints) validateFields();
+                }}
+                error={Boolean(fieldErrors.storyPoints)}
+                helperText={fieldErrors.storyPoints}
+                inputProps={{ min: LIMITS.storyPointsMin, max: LIMITS.storyPointsMax, step: 1 }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Tooltip title="Agile velocity complexity points (0 - 1000)">
+                        <InfoOutlinedIcon fontSize="small" sx={{ color: 'text.secondary', cursor: 'help' }} />
+                      </Tooltip>
+                    </InputAdornment>
+                  ),
+                }}
               />
             </Grid>
           </Grid>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={onClose} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="contained" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : itemToEdit ? 'Save Changes' : 'Create Work Item'}
-          </Button>
+          <Tooltip title="Cancel changes">
+            <Button onClick={onClose} disabled={isSubmitting}>
+              Cancel
+            </Button>
+          </Tooltip>
+          <Tooltip title={isSubmitting ? 'Saving...' : itemToEdit ? 'Save updated work item' : 'Create new work item'}>
+            <span>
+              <Button type="submit" variant="contained" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving...' : itemToEdit ? 'Save Changes' : 'Create Work Item'}
+              </Button>
+            </span>
+          </Tooltip>
         </DialogActions>
       </form>
-    </Dialog>
+    </FormDialog>
   );
 };
+
+export default WorkItemDialog;

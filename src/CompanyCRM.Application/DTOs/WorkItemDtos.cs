@@ -1,5 +1,6 @@
 namespace CompanyCRM.Application.DTOs;
 
+using System.ComponentModel.DataAnnotations;
 using CompanyCRM.Domain.Enums;
 
 public record WorkItemDto(
@@ -53,29 +54,29 @@ public record WorkItemHistoryDto(
 );
 
 public record CreateWorkItemDto(
-    Guid ProjectId,
-    string Title,
-    string? Description = null,
+    [Required] Guid ProjectId,
+    [Required, StringLength(200)] string Title,
+    [StringLength(4000)] string? Description = null,
     WorkItemType Type = WorkItemType.Task,
     WorkItemPriority Priority = WorkItemPriority.Medium,
     Guid? AssigneeId = null,
     Guid? ReviewerId = null,
-    decimal EstimatedHours = 0.0m,
-    int StoryPoints = 0,
-    string? SprintName = null
+    [Range(0, 9999.99)] decimal EstimatedHours = 0.0m,
+    [Range(0, 1000)] int StoryPoints = 0,
+    [StringLength(100)] string? SprintName = null
 );
 
 public record UpdateWorkItemDto(
-    string? Title = null,
-    string? Description = null,
+    [StringLength(200)] string? Title = null,
+    [StringLength(4000)] string? Description = null,
     WorkItemType? Type = null,
     WorkItemStatus? Status = null,
     WorkItemPriority? Priority = null,
     Guid? AssigneeId = null,
     Guid? ReviewerId = null,
-    decimal? EstimatedHours = null,
-    int? StoryPoints = null,
-    string? SprintName = null,
+    [Range(0, 9999.99)] decimal? EstimatedHours = null,
+    [Range(0, 1000)] int? StoryPoints = null,
+    [StringLength(100)] string? SprintName = null,
     int? BoardPosition = null
 );
 
@@ -118,9 +119,9 @@ public record StopTimerRequestDto(
 );
 
 public record CreateManualTimeEntryDto(
-    int DurationMinutes,
+    [Range(1, 1440, ErrorMessage = "DurationMinutes must be between 1 and 1440 (24 hours).")] int DurationMinutes,
     bool IsBillable,
-    string? Notes,
+    [StringLength(1000)] string? Notes,
     DateOnly LoggedDate
 );
 

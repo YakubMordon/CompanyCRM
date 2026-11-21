@@ -13,9 +13,11 @@ import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
+import Tooltip from '@mui/material/Tooltip';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { EmployeeDirectoryDto } from '../types';
 import { employeesApi } from '../services/employeesApi';
+import { TruncatedText } from '../components/common/TruncatedText';
 
 export const EmployeesDirectoryPage: React.FC = () => {
   const navigate = useNavigate();
@@ -55,24 +57,56 @@ export const EmployeesDirectoryPage: React.FC = () => {
     });
   }, [employees, search, selectedDepartment]);
 
+  const cellCenterSx = {
+    display: 'flex',
+    alignItems: 'center',
+    height: '100%',
+    width: '100%',
+    minWidth: 0,
+  };
+
   const columns: GridColDef[] = [
     {
       field: 'fullName',
       headerName: 'Employee',
-      flex: 1,
-      minWidth: 200,
+      flex: 1.2,
+      minWidth: 220, 
       renderCell: (params: GridRenderCellParams<EmployeeDirectoryDto>) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontWeight: 600 }}>
+        <Box sx={{ ...cellCenterSx, gap: 1.5, width: '100%' }}>
+          <Avatar
+            sx={{
+              width: 34,
+              height: 34,
+              bgcolor: 'primary.main',
+              fontWeight: 600,
+              flexShrink: 0,
+            }}
+          >
             {params.row.fullName.charAt(0)}
           </Avatar>
-          <Box>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              {params.row.fullName}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {params.row.email}
-            </Typography>
+
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              gap: '2px',
+              minWidth: 0,
+              flexGrow: 1,
+              overflow: 'hidden',
+            }}
+          >
+            <TruncatedText
+              text={params.row.fullName}
+              variant="body2"
+              sx={{ fontWeight: 600, lineHeight: 1.15 }}
+            />
+            <TruncatedText
+              text={params.row.email}
+              variant="caption"
+              color="text.secondary"
+              sx={{ lineHeight: 1.15 }}
+            />
           </Box>
         </Box>
       ),
@@ -81,68 +115,124 @@ export const EmployeesDirectoryPage: React.FC = () => {
       field: 'department',
       headerName: 'Department',
       width: 140,
+      renderCell: (params) => (
+        <Box sx={cellCenterSx}>
+          <TruncatedText text={params.value || '—'} variant="body2" />
+        </Box>
+      ),
     },
     {
       field: 'jobTitle',
       headerName: 'Job Title',
       width: 180,
+      renderCell: (params) => (
+        <Box sx={cellCenterSx}>
+          <TruncatedText text={params.value || '—'} variant="body2" />
+        </Box>
+      ),
     },
     {
       field: 'seniorityRank',
       headerName: 'Seniority',
-      width: 110,
+      width: 120,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params: GridRenderCellParams<EmployeeDirectoryDto>) => (
-        <Chip
-          label={params.value}
-          size="small"
-          variant="outlined"
-          sx={{ fontWeight: 600, fontSize: '0.7rem' }}
-        />
+        <Box sx={{ ...cellCenterSx, justifyContent: 'center' }}>
+          <Tooltip title={`Seniority Level: ${params.value}`}>
+            <Chip
+              label={params.value}
+              size="small"
+              variant="outlined"
+              sx={{ fontWeight: 600, fontSize: '0.7rem' }}
+            />
+          </Tooltip>
+        </Box>
       ),
     },
     {
       field: 'role',
       headerName: 'System Role',
-      width: 130,
+      width: 140,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params: GridRenderCellParams<EmployeeDirectoryDto>) => (
-        <Chip
-          label={params.value}
-          size="small"
-          color={
-            params.value === 'HigherManagement'
-              ? 'success'
-              : params.value === 'TeamLead'
-              ? 'warning'
-              : 'primary'
-          }
-          sx={{ fontWeight: 600, fontSize: '0.7rem' }}
-        />
+        <Box sx={{ ...cellCenterSx, justifyContent: 'center' }}>
+          <Tooltip title={`System Permission Role: ${params.value}`}>
+            <Chip
+              label={params.value}
+              size="small"
+              color={
+                params.value === 'HigherManagement'
+                  ? 'success'
+                  : params.value === 'TeamLead'
+                  ? 'warning'
+                  : 'primary'
+              }
+              sx={{ fontWeight: 600, fontSize: '0.7rem' }}
+            />
+          </Tooltip>
+        </Box>
       ),
     },
     {
       field: 'skills',
       headerName: 'Top Skills Matrix',
-      flex: 1.2,
-      minWidth: 240,
+      flex: 1.3,
+      minWidth: 260,
       renderCell: (params: GridRenderCellParams<EmployeeDirectoryDto>) => {
         const skills = params.row.skills || [];
+        const extraSkills = skills
+          .slice(3)
+          .map((s) => `${s.skillName} (${s.proficiencyLevel}★)`)
+          .join(', ');
+
         return (
-          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'nowrap', overflow: 'hidden' }}>
+          <Box
+            sx={{
+              ...cellCenterSx,
+              gap: 0.5,
+              width: '100%',
+              minWidth: 0,
+              overflow: 'hidden',
+            }}
+          >
             {skills.slice(0, 3).map((s) => (
-              <Chip
-                key={s.id}
-                label={`${s.skillName} (${s.proficiencyLevel}★)`}
-                size="small"
-                variant="outlined"
-                sx={{ height: 22, fontSize: '0.65rem' }}
-              />
+              <Tooltip key={s.id} title={`${s.skillName} - Level ${s.proficiencyLevel}/5`}>
+                <Chip
+                  label={`${s.skillName} (${s.proficiencyLevel}★)`}
+                  size="small"
+                  variant="outlined"
+                  sx={{
+                    height: 22,
+                    fontSize: '0.65rem',
+                    minWidth: 0,
+                    maxWidth: 115,
+                    '& .MuiChip-label': {
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    },
+                  }}
+                />
+              </Tooltip>
             ))}
+
             {skills.length > 3 && (
-              <Chip
-                label={`+${skills.length - 3}`}
-                size="small"
-                sx={{ height: 22, fontSize: '0.65rem' }}
-              />
+              <Tooltip title={`Additional skills: ${extraSkills}`}>
+                <Chip
+                  label={`+${skills.length - 3}`}
+                  size="small"
+                  color="secondary"
+                  variant="outlined"
+                  sx={{
+                    height: 22,
+                    fontSize: '0.65rem',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                />
+              </Tooltip>
             )}
           </Box>
         );
@@ -151,17 +241,23 @@ export const EmployeesDirectoryPage: React.FC = () => {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 130,
+      width: 140,
+      align: 'center',
+      headerAlign: 'center',
       sortable: false,
       renderCell: (params: GridRenderCellParams<EmployeeDirectoryDto>) => (
-        <Button
-          size="small"
-          startIcon={<AccountCircleIcon />}
-          onClick={() => navigate(`/profile?id=${params.row.id}`)}
-          sx={{ textTransform: 'none', fontWeight: 600 }}
-        >
-          View Profile
-        </Button>
+        <Box sx={{ ...cellCenterSx, justifyContent: 'center' }}>
+          <Tooltip title={`View full profile and skills for ${params.row.fullName}`}>
+            <Button
+              size="small"
+              startIcon={<AccountCircleIcon />}
+              onClick={() => navigate(`/profile?id=${params.row.id}`)}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            >
+              View Profile
+            </Button>
+          </Tooltip>
+        </Box>
       ),
     },
   ];
@@ -187,34 +283,38 @@ export const EmployeesDirectoryPage: React.FC = () => {
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-          <TextField
-            size="small"
-            placeholder="Search name, email, title..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ width: { xs: 200, sm: 260 } }}
-          />
+          <Tooltip title="Filter employees by name, email, job title or department">
+            <TextField
+              size="small"
+              placeholder="Search name, email, title..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ width: { xs: 200, sm: 260 } }}
+            />
+          </Tooltip>
 
           <FormControl size="small" sx={{ width: 160 }}>
             <InputLabel>Department</InputLabel>
-            <Select
-              value={selectedDepartment}
-              label="Department"
-              onChange={(e) => setSelectedDepartment(e.target.value)}
-            >
-              {departments.map((dept) => (
-                <MenuItem key={dept} value={dept}>
-                  {dept}
-                </MenuItem>
-              ))}
-            </Select>
+            <Tooltip title="Filter directory by specific department">
+              <Select
+                value={selectedDepartment}
+                label="Department"
+                onChange={(e) => setSelectedDepartment(e.target.value)}
+              >
+                {departments.map((dept) => (
+                  <MenuItem key={dept} value={dept}>
+                    {dept}
+                  </MenuItem>
+                ))}
+              </Select>
+            </Tooltip>
           </FormControl>
         </Box>
       </Box>
@@ -224,6 +324,7 @@ export const EmployeesDirectoryPage: React.FC = () => {
           rows={filteredEmployees}
           columns={columns}
           loading={isLoading}
+          rowHeight={60}
           pageSizeOptions={[10, 25, 50]}
           initialState={{
             pagination: { paginationModel: { pageSize: 25 } },
@@ -232,6 +333,10 @@ export const EmployeesDirectoryPage: React.FC = () => {
           sx={{
             borderRadius: 2,
             borderColor: 'divider',
+            '& .MuiDataGrid-cell': {
+              display: 'flex',
+              alignItems: 'center',
+            },
             '& .MuiDataGrid-columnHeaders': {
               bgcolor: 'action.hover',
               fontWeight: 700,
@@ -242,3 +347,5 @@ export const EmployeesDirectoryPage: React.FC = () => {
     </Box>
   );
 };
+
+export default EmployeesDirectoryPage;

@@ -29,6 +29,8 @@ import {
 } from '../../types';
 import { workItemsApi } from '../../services/workItemsApi';
 import { syncApi } from '../../services/syncApi';
+import { manualTimeEntrySchema, LIMITS } from '../../validation/schemas';
+import { getApiErrorMessage } from '../../validation/errorMessage';
 import { StatusChip } from '../common/StatusChip';
 import { getHistoryActionLabel, getHistoryNote } from './workItemHelpers';
 
@@ -154,8 +156,13 @@ export const WorkItemDrawer: React.FC<WorkItemDrawerProps> = ({
     if (!item) return;
 
     const mins = parseInt(manualMinutes, 10);
-    if (isNaN(mins) || mins <= 0 || mins > 1440) {
-      setTimeError('Duration must be between 1 and 1440 minutes (24 hours).');
+    const validation = manualTimeEntrySchema.safeParse({
+      durationMinutes: isNaN(mins) ? -1 : mins,
+      notes: manualNotes,
+    });
+
+    if (!validation.success) {
+      setTimeError(validation.error.issues[0]?.message || 'Invalid time entry');
       return;
     }
 
@@ -180,7 +187,7 @@ export const WorkItemDrawer: React.FC<WorkItemDrawerProps> = ({
       const h = await workItemsApi.getWorkItemHistory(item.id);
       setHistory(h);
     } catch (err: any) {
-      setTimeError(err?.response?.data?.detail || err?.message || 'Failed to log manual time');
+      setTimeError(getApiErrorMessage(err, 'Failed to log manual time'));
     } finally {
       setIsSubmittingTime(false);
     }

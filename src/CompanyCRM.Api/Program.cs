@@ -46,6 +46,16 @@ builder.AddServiceDefaults();
 
 // 2. Controllers & JSON Options
 builder.Services.AddControllers()
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var problemDetails = new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(context.ModelState);
+            var firstError = problemDetails.Errors.Values.SelectMany(v => v).FirstOrDefault() ?? "Validation failed.";
+            problemDetails.Extensions["message"] = firstError;
+            return new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(problemDetails);
+        };
+    })
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());

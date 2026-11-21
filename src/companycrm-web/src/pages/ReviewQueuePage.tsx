@@ -28,6 +28,7 @@ import { StatusChip } from '../components/common/StatusChip';
 import { ApproveModal } from '../components/reviews/ApproveModal';
 import { ClarifyModal } from '../components/reviews/ClarifyModal';
 import { DenyModal } from '../components/reviews/DenyModal';
+import { TruncatedText } from '../components/common/TruncatedText';
 
 export const ReviewQueuePage: React.FC = () => {
   const { activeProject } = useProject();
@@ -190,7 +191,7 @@ export const ReviewQueuePage: React.FC = () => {
 
                   <TableCell sx={{ maxWidth: 200 }}>
                     {(row.reviewComment || row.latestComment) ? (
-                      <Typography
+                      <TruncatedText
                         variant="caption"
                         color="text.secondary"
                         sx={{
@@ -199,9 +200,8 @@ export const ReviewQueuePage: React.FC = () => {
                           WebkitBoxOrient: 'vertical',
                           overflow: 'hidden',
                         }}
-                      >
-                        {row.reviewComment || row.latestComment}
-                      </Typography>
+                        text={row.reviewComment || row.latestComment || ''}
+                      />
                     ) : (
                       <Typography variant="caption" color="text.secondary">
                         -

@@ -54,15 +54,51 @@ export const CompensationDataGrid: React.FC = () => {
       flex: 1,
       minWidth: 190,
       renderCell: (params: GridRenderCellParams<EmployeeCompensationDto>) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Avatar sx={{ width: 30, height: 30, bgcolor: 'primary.dark', fontWeight: 600 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            width: '100%',
+            height: '100%',
+          }}
+        >
+          <Avatar
+            sx={{
+              width: 30,
+              height: 30,
+              bgcolor: 'primary.dark',
+              fontWeight: 600,
+              flexShrink: 0,
+            }}
+          >
             {params.row.fullName.charAt(0)}
           </Avatar>
-          <Box>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              gap: '1px',
+              minWidth: 0,
+              flexGrow: 1,
+              overflow: 'hidden',
+            }}
+          >
+            <Typography
+              variant="body2"
+              noWrap
+              sx={{ fontWeight: 600, lineHeight: 1.1 }}
+            >
               {params.row.fullName}
             </Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              noWrap
+              sx={{ lineHeight: 1.1 }}
+            >
               {params.row.department}
             </Typography>
           </Box>
@@ -123,12 +159,21 @@ export const CompensationDataGrid: React.FC = () => {
         const target = params.row.targetUtilizationPercent;
         const isGood = val >= target;
         return (
-          <Box sx={{ width: '100%', mr: 1 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              height: '100%',
+              width: '100%',
+              pr: 1,
+            }}
+          >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-              <Typography variant="caption" sx={{ fontWeight: 700 }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, lineHeight: 1.1 }}>
                 {val.toFixed(1)}%
               </Typography>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.1 }}>
                 Target: {target.toFixed(0)}%
               </Typography>
             </Box>
@@ -150,12 +195,21 @@ export const CompensationDataGrid: React.FC = () => {
         const val = params.value as number;
         const isHigh = val >= 80;
         return (
-          <Box sx={{ width: '100%', mr: 1 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              height: '100%',
+              width: '100%',
+              pr: 1,
+            }}
+          >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-              <Typography variant="caption" sx={{ fontWeight: 700 }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, lineHeight: 1.1 }}>
                 {val.toFixed(1)}%
               </Typography>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.1 }}>
                 On-Time: {params.row.onTimeSubmissionPercent.toFixed(0)}%
               </Typography>
             </Box>

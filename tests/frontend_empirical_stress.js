@@ -378,7 +378,37 @@ await runTest('cutoffHelpers: Parses backend "[0, 6]" and legacy string arrays t
 });
 
 // -----------------------------------------------------------------------------
-// Test 10: Build artifact sanity check
+// Test 10: Validation Schemas & Limits Boundary Enforcement
+// -----------------------------------------------------------------------------
+await runTest('validation.schemas: Project, WorkItem, and TimeEntry boundary validation', () => {
+  const schemasMod = loadTsModule('validation/schemas.ts');
+  const { projectSchema, workItemSchema, manualTimeEntrySchema, LIMITS } = schemasMod;
+
+  assert.equal(LIMITS.projectCodeMax, 10);
+  assert.equal(LIMITS.projectNameMax, 100);
+  assert.equal(LIMITS.workItemTitleMax, 200);
+
+  // Project Code valid boundary
+  assert.equal(projectSchema.safeParse({ code: 'PRJ10', name: 'My Project' }).success, true);
+  // Project Code too long (> 10)
+  assert.equal(projectSchema.safeParse({ code: 'TOOLONGCODE1', name: 'My Project' }).success, false);
+  // Project Code non-alphanumeric
+  assert.equal(projectSchema.safeParse({ code: 'PRJ-10!', name: 'My Project' }).success, false);
+
+  // Work Item title boundary (200 characters)
+  const validTitle = 'A'.repeat(200);
+  const invalidTitle = 'A'.repeat(201);
+  assert.equal(workItemSchema.safeParse({ title: validTitle }).success, true);
+  assert.equal(workItemSchema.safeParse({ title: invalidTitle }).success, false);
+
+  // Manual time entry duration limits (1 to 1440)
+  assert.equal(manualTimeEntrySchema.safeParse({ durationMinutes: 60 }).success, true);
+  assert.equal(manualTimeEntrySchema.safeParse({ durationMinutes: 0 }).success, false);
+  assert.equal(manualTimeEntrySchema.safeParse({ durationMinutes: 1441 }).success, false);
+});
+
+// -----------------------------------------------------------------------------
+// Test 11: Build artifact sanity check
 // -----------------------------------------------------------------------------
 await runTest('Frontend production build output exists (src/companycrm-web/dist/index.html)', () => {
   const indexPath = path.join(webRoot, 'dist', 'index.html');

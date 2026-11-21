@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using CompanyCRM.Domain.Enums;
 
 namespace CompanyCRM.Application.DTOs;
@@ -21,21 +22,21 @@ public record ProjectDto(
 );
 
 public record CreateProjectDto(
-    string Code,
-    string Name,
-    string? Description,
+    [Required, StringLength(10, MinimumLength = 2), RegularExpression("^[A-Za-z0-9]+$", ErrorMessage = "Project Code must be alphanumeric.")] string Code,
+    [Required, StringLength(100)] string Name,
+    [StringLength(1000)] string? Description = null,
     ExternalSourceType ExternalSource = ExternalSourceType.None,
-    string? ExternalOrgUrl = null,
-    string? ExternalProjectName = null,
-    string? ExternalPat = null,
+    [StringLength(500)] string? ExternalOrgUrl = null,
+    [StringLength(100)] string? ExternalProjectName = null,
+    [StringLength(500)] string? ExternalPat = null,
     bool IsSyncEnabled = false,
     bool IsSimulatedMode = true
 );
 
 public record UpdateProjectDto(
-    string? Name,
-    string? Description,
-    bool? IsActive
+    [StringLength(100)] string? Name = null,
+    [StringLength(1000)] string? Description = null,
+    bool? IsActive = null
 );
 
 public record ProjectMemberDto(
