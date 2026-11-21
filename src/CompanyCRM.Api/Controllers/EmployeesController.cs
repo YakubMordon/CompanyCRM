@@ -33,12 +33,18 @@ public class EmployeesController : ControllerBase
     public async Task<ActionResult<List<EmployeeDirectoryDto>>> GetEmployees(
         [FromQuery] string? search,
         [FromQuery] string? department,
+        [FromQuery] Guid? projectId = null,
         CancellationToken ct = default)
     {
         var query = _dbContext.Employees
             .AsNoTracking()
             .Include(e => e.Skills)
             .AsQueryable();
+
+        if (projectId.HasValue)
+        {
+            query = query.Where(e => e.ProjectMemberships.Any(pm => pm.ProjectId == projectId.Value));
+        }
 
         if (!string.IsNullOrWhiteSpace(department))
         {

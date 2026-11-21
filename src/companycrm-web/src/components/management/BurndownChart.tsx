@@ -17,7 +17,7 @@ import { BurndownDto } from '../../types';
 import { managementApi } from '../../services/managementApi';
 
 interface BurndownChartProps {
-  projectId: string;
+  projectId?: string;
 }
 
 export const BurndownChart: React.FC<BurndownChartProps> = ({ projectId }) => {
@@ -27,7 +27,7 @@ export const BurndownChart: React.FC<BurndownChartProps> = ({ projectId }) => {
   useEffect(() => {
     setIsLoading(true);
     managementApi
-      .getBurndown(projectId, 'Sprint 1')
+      .getBurndown(projectId || undefined, 'Sprint 1')
       .then(setData)
       .catch(console.error)
       .finally(() => setIsLoading(false));

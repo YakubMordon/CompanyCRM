@@ -9,7 +9,7 @@ import { managementApi } from '../../services/managementApi';
 import { buildCompletionChartData } from './analyticsHelpers';
 
 interface CompletionRatesChartProps {
-  projectId: string;
+  projectId?: string;
 }
 
 const STATUS_COLORS = ['#64748b', '#0284c7', '#d97706', '#7c3aed', '#16a34a'];
@@ -21,7 +21,7 @@ export const CompletionRatesChart: React.FC<CompletionRatesChartProps> = ({ proj
   useEffect(() => {
     setIsLoading(true);
     managementApi
-      .getCompletionRates(projectId)
+      .getCompletionRates(projectId || undefined)
       .then(setData)
       .catch(console.error)
       .finally(() => setIsLoading(false));

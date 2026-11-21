@@ -98,15 +98,13 @@ export const DailyPlanningTab: React.FC = () => {
     loadDailyPlan();
   }, [loadDailyPlan]);
 
-  // Load project work items for picker
+  // Load work items across projects for global picker
   useEffect(() => {
-    if (activeProject) {
-      workItemsApi
-        .getWorkItems({ projectId: activeProject.id, pageSize: 100 })
-        .then((res) => setProjectWorkItems(res.items))
-        .catch(console.error);
-    }
-  }, [activeProject]);
+    workItemsApi
+      .getWorkItems({ pageSize: 150 })
+      .then((res) => setProjectWorkItems(res.items))
+      .catch(console.error);
+  }, []);
 
   // Subscribe to SignalR DailyPlanSubmitted
   useEffect(() => {
@@ -137,6 +135,11 @@ export const DailyPlanningTab: React.FC = () => {
     });
   };
 
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const isPastDate = planDate < todayStr;
+  const isToday = planDate === todayStr;
+  const isPast11Am = isToday && new Date().getHours() >= 11;
+
   const totalPlannedHours = useMemo(() => {
     return items.reduce((sum, item) => sum + (Number(item.plannedHours) || 0), 0);
   }, [items]);
@@ -146,7 +149,10 @@ export const DailyPlanningTab: React.FC = () => {
     setValidationError(null);
     setFeedback(null);
 
-    // Validate planned hours: each item between 0.1 and 24.0
+    if (isPastDate) {
+      setValidationError('Daily plan check-ins for past dates are closed. Submissions are strictly limited until 23:59 on the plan date.');
+      return;
+    }
     if (items.length === 0) {
       setValidationError('At least one task item must be planned.');
       return;
@@ -205,6 +211,18 @@ export const DailyPlanningTab: React.FC = () => {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       {/* Date Picker & On-Time Status Bar */}
+      {isPastDate && (
+        <Alert severity="error">
+          Daily plan check-ins for past dates are closed. Planning is limited until 23:59 of the plan date.
+        </Alert>
+      )}
+
+      {isPast11Am && !existingPlan && (
+        <Alert severity="warning" icon={<WarningAmberIcon />}>
+          Warning: It is past 11:00 AM. Your daily plan submission will be recorded with a late check-in notice.
+        </Alert>
+      )}
+
       <Paper
         variant="outlined"
         sx={{
@@ -432,10 +450,10 @@ export const DailyPlanningTab: React.FC = () => {
               variant="contained"
               size="large"
               startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isPastDate}
               sx={{ fontWeight: 700, px: 4 }}
             >
-              {isSubmitting ? 'Submitting...' : 'Submit Daily Plan'}
+              {isSubmitting ? 'Submitting...' : isPastDate ? 'Submission Closed (Past 23:59)' : 'Submit Daily Plan'}
             </Button>
           </Box>
         </form>

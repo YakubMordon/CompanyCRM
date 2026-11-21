@@ -17,7 +17,7 @@ import { HoursComparisonDto } from '../../types';
 import { managementApi } from '../../services/managementApi';
 
 interface HoursComparisonChartProps {
-  projectId: string;
+  projectId?: string;
 }
 
 export const HoursComparisonChart: React.FC<HoursComparisonChartProps> = ({ projectId }) => {
@@ -27,7 +27,7 @@ export const HoursComparisonChart: React.FC<HoursComparisonChartProps> = ({ proj
   useEffect(() => {
     setIsLoading(true);
     managementApi
-      .getHoursComparison(projectId)
+      .getHoursComparison(projectId || undefined)
       .then(setData)
       .catch(console.error)
       .finally(() => setIsLoading(false));

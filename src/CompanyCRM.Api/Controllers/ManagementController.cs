@@ -26,7 +26,7 @@ public class ManagementController : ControllerBase
 
     [HttpGet("profitability")]
     public async Task<ActionResult<ProjectProfitabilityDto>> GetProfitability(
-        [FromQuery] Guid projectId,
+        [FromQuery] Guid? projectId = null,
         [FromQuery] DateOnly? startDate = null,
         [FromQuery] DateOnly? endDate = null,
         CancellationToken ct = default)
@@ -44,7 +44,7 @@ public class ManagementController : ControllerBase
 
     [HttpGet("analytics/velocity")]
     public async Task<ActionResult<IReadOnlyList<SprintVelocityDto>>> GetVelocity(
-        [FromQuery] Guid projectId,
+        [FromQuery] Guid? projectId = null,
         [FromQuery] int sprintsCount = 5,
         CancellationToken ct = default)
     {
@@ -54,7 +54,7 @@ public class ManagementController : ControllerBase
 
     [HttpGet("analytics/hours-comparison")]
     public async Task<ActionResult<IReadOnlyList<HoursComparisonDto>>> GetHoursComparison(
-        [FromQuery] Guid projectId,
+        [FromQuery] Guid? projectId = null,
         CancellationToken ct = default)
     {
         var comparison = await _analyticsService.GetHoursComparisonAsync(projectId, ct);
@@ -63,8 +63,8 @@ public class ManagementController : ControllerBase
 
     [HttpGet("analytics/completion-rates")]
     public async Task<ActionResult<CompletionRateDto>> GetCompletionRates(
-        [FromQuery] Guid projectId,
-        CancellationToken ct)
+        [FromQuery] Guid? projectId = null,
+        CancellationToken ct = default)
     {
         var completionRates = await _analyticsService.GetCompletionRateAsync(projectId, ct);
         return Ok(completionRates);
@@ -72,7 +72,7 @@ public class ManagementController : ControllerBase
 
     [HttpGet("analytics/burndown")]
     public async Task<ActionResult<BurndownDto>> GetBurndown(
-        [FromQuery] Guid projectId,
+        [FromQuery] Guid? projectId = null,
         [FromQuery] string? sprintName = null,
         CancellationToken ct = default)
     {

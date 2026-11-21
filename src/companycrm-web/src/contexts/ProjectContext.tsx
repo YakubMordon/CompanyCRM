@@ -25,7 +25,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (project) {
       localStorage.setItem('crm_active_project_id', project.id);
     } else {
-      localStorage.removeItem('crm_active_project_id');
+      localStorage.setItem('crm_active_project_id', 'ALL');
     }
   }, []);
 

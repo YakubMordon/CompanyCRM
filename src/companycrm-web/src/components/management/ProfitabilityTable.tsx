@@ -16,7 +16,7 @@ import { managementApi } from '../../services/managementApi';
 import { computeEmployeeMargin } from './analyticsHelpers';
 
 interface ProfitabilityTableProps {
-  projectId: string;
+  projectId?: string;
 }
 
 export const ProfitabilityTable: React.FC<ProfitabilityTableProps> = ({ projectId }) => {
@@ -26,7 +26,7 @@ export const ProfitabilityTable: React.FC<ProfitabilityTableProps> = ({ projectI
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await managementApi.getProfitability(projectId);
+      const data = await managementApi.getProfitability(projectId || undefined);
       setProfitability(data);
     } catch (err) {
       console.error('Failed to load profitability:', err);

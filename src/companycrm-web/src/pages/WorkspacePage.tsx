@@ -59,12 +59,11 @@ export const WorkspacePage: React.FC = () => {
   }, []);
 
   const loadWorkItems = useCallback(async () => {
-    if (!activeProject) return;
     try {
       setIsLoading(true);
       const res = await workItemsApi.getWorkItems({
-        projectId: activeProject.id,
-        pageSize: 100,
+        projectId: activeProject?.id,
+        pageSize: 150,
       });
       setWorkItems(res.items);
     } catch (err) {
@@ -89,7 +88,7 @@ export const WorkspacePage: React.FC = () => {
           const next = [...prev];
           next[index] = updatedItem;
           return next;
-        } else if (activeProject && updatedItem.projectId === activeProject.id) {
+        } else if (!activeProject || updatedItem.projectId === activeProject.id) {
           return [updatedItem, ...prev];
         }
         return prev;
@@ -189,15 +188,7 @@ export const WorkspacePage: React.FC = () => {
     });
   }, [workItems, searchQuery, selectedTypeFilter, selectedPriorityFilter]);
 
-  if (!activeProject) {
-    return (
-      <Box sx={{ p: 4, textAlign: 'center' }}>
-        <Typography variant="h6" color="text.secondary">
-          Please select or create an active project to view work items.
-        </Typography>
-      </Box>
-    );
-  }
+  const pageTitle = activeProject ? activeProject.name : 'All Projects (Company-wide)';
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -213,7 +204,7 @@ export const WorkspacePage: React.FC = () => {
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            {activeProject.name}
+            {pageTitle}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             ({filteredItems.length} items)
@@ -402,7 +393,7 @@ export const WorkspacePage: React.FC = () => {
         open={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
         onSubmit={handleCreateOrUpdate}
-        projectId={activeProject.id}
+        projectId={activeProject?.id}
         itemToEdit={editingItem}
       />
 

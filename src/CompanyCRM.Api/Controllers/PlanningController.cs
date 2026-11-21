@@ -278,16 +278,27 @@ public class PlanningController : ControllerBase
             .FirstOrDefaultAsync(c => c.ProjectId == null, ct)
             ?? new PlanningCutoffConfig
             {
-                CutoffTimeLocal = new TimeOnly(10, 0),
+                CutoffTimeLocal = new TimeOnly(11, 0),
                 TimeZoneId = "UTC",
                 IsReminderEnabled = true
             };
 
+        var now = DateTimeOffset.UtcNow;
+
+        var probePlan = new DailyPlan
+        {
+            PlanDate = request.PlanDate,
+            SubmittedAt = now
+        };
+
+        if (!probePlan.IsSubmissionPermitted(cutoffConfig, now))
+        {
+            return BadRequest(new { message = $"Daily plan check-ins for {request.PlanDate} are closed. Submissions are strictly limited until 23:59 on the plan date." });
+        }
+
         var dailyPlan = await _dbContext.DailyPlans
             .Include(dp => dp.Items)
             .FirstOrDefaultAsync(dp => dp.EmployeeId == callerId && dp.PlanDate == request.PlanDate, ct);
-
-        var now = DateTimeOffset.UtcNow;
 
         if (dailyPlan == null)
         {
@@ -307,6 +318,11 @@ public class PlanningController : ControllerBase
             dailyPlan.Blockers = request.Blockers?.Trim();
             dailyPlan.SummaryNotes = request.SummaryNotes?.Trim();
             dailyPlan.UpdatedAt = now;
+            // Only evaluate submission timing on update if it wasn't already marked on-time initially
+            if (!dailyPlan.IsSubmittedOnTime)
+            {
+                dailyPlan.EvaluateSubmissionTiming(cutoffConfig, now);
+            }
             if (dailyPlan.Items.Count > 0)
             {
                 _dbContext.DailyPlanItems.RemoveRange(dailyPlan.Items.ToList());
@@ -401,7 +417,7 @@ public class PlanningController : ControllerBase
                 Guid.Empty,
                 null,
                 null,
-                new TimeOnly(10, 0),
+                new TimeOnly(11, 0),
                 "UTC",
                 true,
                 "[0, 6]",

@@ -12,7 +12,10 @@ export function resolveActiveProject<T extends { id: string }>(
   projects: T[],
   savedId: string | null | undefined
 ): T | null {
-  return projects.find((p) => p.id === savedId) || projects[0] || null;
+  if (savedId === 'ALL') {
+    return null;
+  }
+  return projects.find((p) => p.id === savedId) || null;
 }
 
 export function dispatchCallbackSafely<T>(

@@ -7,7 +7,7 @@ public class PlanningCutoffConfig
     public Guid? ProjectId { get; set; } // null = Global default config
     public Project? Project { get; set; }
 
-    public TimeOnly CutoffTimeLocal { get; set; } = new TimeOnly(10, 0, 0); // 10:00 AM
+    public TimeOnly CutoffTimeLocal { get; set; } = new TimeOnly(11, 0, 0); // 11:00 AM warning cutoff
     public string TimeZoneId { get; set; } = "UTC";
     public bool IsReminderEnabled { get; set; } = true;
     public string ExcludedDaysOfWeekJson { get; set; } = "[0, 6]"; // Sunday=0, Saturday=6

@@ -15,8 +15,8 @@ import {
 } from '../types';
 
 export const employeesApi = {
-  getEmployees: async (search?: string, department?: string): Promise<EmployeeDirectoryDto[]> => {
-    return (await getApiEmployees({ search, department })) as EmployeeDirectoryDto[];
+  getEmployees: async (search?: string, department?: string, projectId?: string): Promise<EmployeeDirectoryDto[]> => {
+    return (await getApiEmployees({ search, department, projectId: projectId || undefined } as any)) as EmployeeDirectoryDto[];
   },
 
   getEmployeeProfile: async (id: string): Promise<EmployeeProfileDto> => {

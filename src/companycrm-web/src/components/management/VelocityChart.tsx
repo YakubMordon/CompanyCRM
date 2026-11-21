@@ -17,7 +17,7 @@ import { SprintVelocityDto } from '../../types';
 import { managementApi } from '../../services/managementApi';
 
 interface VelocityChartProps {
-  projectId: string;
+  projectId?: string;
 }
 
 export const VelocityChart: React.FC<VelocityChartProps> = ({ projectId }) => {
@@ -27,7 +27,7 @@ export const VelocityChart: React.FC<VelocityChartProps> = ({ projectId }) => {
   useEffect(() => {
     setIsLoading(true);
     managementApi
-      .getVelocity(projectId, 5)
+      .getVelocity(projectId || undefined, 5)
       .then(setData)
       .catch(console.error)
       .finally(() => setIsLoading(false));

@@ -17,23 +17,31 @@ import Tooltip from '@mui/material/Tooltip';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { EmployeeDirectoryDto } from '../types';
 import { employeesApi } from '../services/employeesApi';
+import { useProject } from '../contexts/ProjectContext';
 import { TruncatedText } from '../components/common/TruncatedText';
 
 export const EmployeesDirectoryPage: React.FC = () => {
   const navigate = useNavigate();
+  const { projects, activeProject } = useProject();
   const [employees, setEmployees] = useState<EmployeeDirectoryDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('All');
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(activeProject?.id || 'ALL');
+
+  useEffect(() => {
+    setSelectedProjectId(activeProject?.id || 'ALL');
+  }, [activeProject]);
 
   useEffect(() => {
     setIsLoading(true);
+    const projId = selectedProjectId === 'ALL' ? undefined : selectedProjectId;
     employeesApi
-      .getEmployees()
+      .getEmployees(undefined, undefined, projId)
       .then(setEmployees)
       .catch(console.error)
       .finally(() => setIsLoading(false));
-  }, []);
+  }, [selectedProjectId]);
 
   const departments = useMemo(() => {
     const set = new Set<string>();
@@ -299,6 +307,26 @@ export const EmployeesDirectoryPage: React.FC = () => {
               sx={{ width: { xs: 200, sm: 260 } }}
             />
           </Tooltip>
+
+          <FormControl size="small" sx={{ width: 180 }}>
+            <InputLabel>Project Scope</InputLabel>
+            <Tooltip title="Filter employees overall or by specific project">
+              <Select
+                value={selectedProjectId}
+                label="Project Scope"
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+              >
+                <MenuItem value="ALL">
+                  <em>All Projects (Overall)</em>
+                </MenuItem>
+                {projects.map((p) => (
+                  <MenuItem key={p.id} value={p.id}>
+                    {p.name} ({p.code})
+                  </MenuItem>
+                ))}
+              </Select>
+            </Tooltip>
+          </FormControl>
 
           <FormControl size="small" sx={{ width: 160 }}>
             <InputLabel>Department</InputLabel>

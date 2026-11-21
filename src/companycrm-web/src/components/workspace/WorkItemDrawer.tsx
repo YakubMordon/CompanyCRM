@@ -26,12 +26,17 @@ import {
   TimeEntryDto,
   WorkItemDto,
   WorkItemHistoryDto,
+  WorkItemReviewQueueDto,
 } from '../../types';
 import { workItemsApi } from '../../services/workItemsApi';
 import { syncApi } from '../../services/syncApi';
+import { useAuth } from '../../contexts/AuthContext';
 import { manualTimeEntrySchema, LIMITS } from '../../validation/schemas';
 import { getApiErrorMessage } from '../../validation/errorMessage';
 import { StatusChip } from '../common/StatusChip';
+import { ApproveModal } from '../reviews/ApproveModal';
+import { ClarifyModal } from '../reviews/ClarifyModal';
+import { DenyModal } from '../reviews/DenyModal';
 import { getHistoryActionLabel, getHistoryNote } from './workItemHelpers';
 
 interface WorkItemDrawerProps {
@@ -53,6 +58,12 @@ export const WorkItemDrawer: React.FC<WorkItemDrawerProps> = ({
   activeTimer,
   onRefreshActiveTimer,
 }) => {
+  const { role } = useAuth();
+  const canReview = role === 'TeamLead' || role === 'HigherManagement';
+  const [isApproveOpen, setIsApproveOpen] = useState(false);
+  const [isClarifyOpen, setIsClarifyOpen] = useState(false);
+  const [isDenyOpen, setIsDenyOpen] = useState(false);
+
   const [history, setHistory] = useState<WorkItemHistoryDto[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isPushingAdo, setIsPushingAdo] = useState(false);
@@ -306,6 +317,56 @@ export const WorkItemDrawer: React.FC<WorkItemDrawerProps> = ({
           {isPushingAdo ? 'Pushing...' : 'Push to ADO'}
         </Button>
       </Box>
+
+      {/* Review Actions for Management / Reviewers */}
+      {canReview && (item.reviewStatus === 'Pending' || item.reviewStatus === 'ClarificationNeeded') && (
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 2,
+            mb: 3,
+            borderRadius: 2,
+            bgcolor: 'action.hover',
+            borderColor: 'warning.main',
+          }}
+        >
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: 'warning.dark' }}>
+            Task Review Pending Approval
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+            This item requires review approval before proceeding to active backlog / sprint delivery.
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Button
+              size="small"
+              variant="contained"
+              color="success"
+              onClick={() => setIsApproveOpen(true)}
+              sx={{ fontWeight: 600, textTransform: 'none' }}
+            >
+              Approve Task
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              color="warning"
+              onClick={() => setIsClarifyOpen(true)}
+              sx={{ fontWeight: 600, textTransform: 'none' }}
+            >
+              Request Clarification
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              color="error"
+              onClick={() => setIsDenyOpen(true)}
+              sx={{ fontWeight: 600, textTransform: 'none' }}
+            >
+              Deny
+            </Button>
+          </Box>
+        </Paper>
+      )}
 
       {pushStatusMessage && (
         <Alert
@@ -566,6 +627,116 @@ export const WorkItemDrawer: React.FC<WorkItemDrawerProps> = ({
           </Box>
         )}
       </Box>
+
+      {/* Review Modals */}
+      {item && (
+        <>
+          <ApproveModal
+            item={
+              {
+                id: item.id,
+                workItemId: item.id,
+                code: item.code,
+                workItemCode: item.code,
+                title: item.title,
+                workItemTitle: item.title,
+                projectId: item.projectId,
+                projectCode: item.code.split('-')[0] || 'PRJ',
+                projectName: 'Project',
+                type: item.type,
+                priority: item.priority,
+                creatorId: item.createdById || '',
+                createdById: item.createdById || '',
+                creatorName: item.createdByName || 'Unknown',
+                createdByName: item.createdByName || 'Unknown',
+                reviewerId: item.reviewerId,
+                reviewerName: item.reviewerName,
+                reviewStatus: item.reviewStatus,
+                reviewComment: null,
+                requestedAt: item.createdAt,
+                createdAt: item.createdAt,
+              } as unknown as WorkItemReviewQueueDto
+            }
+            open={isApproveOpen}
+            onClose={() => setIsApproveOpen(false)}
+            onSuccess={async () => {
+              setIsApproveOpen(false);
+              const updated = await workItemsApi.getWorkItemById(item.id);
+              onItemUpdated(updated);
+            }}
+          />
+
+          <ClarifyModal
+            item={
+              {
+                id: item.id,
+                workItemId: item.id,
+                code: item.code,
+                workItemCode: item.code,
+                title: item.title,
+                workItemTitle: item.title,
+                projectId: item.projectId,
+                projectCode: item.code.split('-')[0] || 'PRJ',
+                projectName: 'Project',
+                type: item.type,
+                priority: item.priority,
+                creatorId: item.createdById || '',
+                createdById: item.createdById || '',
+                creatorName: item.createdByName || 'Unknown',
+                createdByName: item.createdByName || 'Unknown',
+                reviewerId: item.reviewerId,
+                reviewerName: item.reviewerName,
+                reviewStatus: item.reviewStatus,
+                reviewComment: null,
+                requestedAt: item.createdAt,
+                createdAt: item.createdAt,
+              } as unknown as WorkItemReviewQueueDto
+            }
+            open={isClarifyOpen}
+            onClose={() => setIsClarifyOpen(false)}
+            onSuccess={async () => {
+              setIsClarifyOpen(false);
+              const updated = await workItemsApi.getWorkItemById(item.id);
+              onItemUpdated(updated);
+            }}
+          />
+
+          <DenyModal
+            item={
+              {
+                id: item.id,
+                workItemId: item.id,
+                code: item.code,
+                workItemCode: item.code,
+                title: item.title,
+                workItemTitle: item.title,
+                projectId: item.projectId,
+                projectCode: item.code.split('-')[0] || 'PRJ',
+                projectName: 'Project',
+                type: item.type,
+                priority: item.priority,
+                creatorId: item.createdById || '',
+                createdById: item.createdById || '',
+                creatorName: item.createdByName || 'Unknown',
+                createdByName: item.createdByName || 'Unknown',
+                reviewerId: item.reviewerId,
+                reviewerName: item.reviewerName,
+                reviewStatus: item.reviewStatus,
+                reviewComment: null,
+                requestedAt: item.createdAt,
+                createdAt: item.createdAt,
+              } as unknown as WorkItemReviewQueueDto
+            }
+            open={isDenyOpen}
+            onClose={() => setIsDenyOpen(false)}
+            onSuccess={async () => {
+              setIsDenyOpen(false);
+              const updated = await workItemsApi.getWorkItemById(item.id);
+              onItemUpdated(updated);
+            }}
+          />
+        </>
+      )}
     </Drawer>
   );
 };

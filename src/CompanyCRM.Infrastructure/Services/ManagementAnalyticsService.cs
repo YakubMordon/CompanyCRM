@@ -77,25 +77,34 @@ public class ManagementAnalyticsService : IManagementAnalyticsService
         => GetEmployeeCompensationsAsync(ct);
 
     public async Task<ProjectProfitabilityDto> GetProjectProfitabilityAsync(
-        Guid projectId,
+        Guid? projectId = null,
         DateOnly? startDate = null,
         DateOnly? endDate = null,
         CancellationToken ct = default)
     {
-        var project = await _dbContext.Projects
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == projectId, ct);
-
-        if (project == null)
+        Project? project = null;
+        if (projectId.HasValue)
         {
-            throw new KeyNotFoundException($"Project with ID '{projectId}' was not found.");
+            project = await _dbContext.Projects
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == projectId.Value, ct);
+
+            if (project == null)
+            {
+                throw new KeyNotFoundException($"Project with ID '{projectId.Value}' was not found.");
+            }
         }
 
         var query = _dbContext.TimeEntries
             .AsNoTracking()
             .Include(t => t.Employee)
             .Include(t => t.WorkItem)
-            .Where(t => t.WorkItem.ProjectId == projectId && !t.IsRunning);
+            .Where(t => !t.IsRunning);
+
+        if (projectId.HasValue)
+        {
+            query = query.Where(t => t.WorkItem.ProjectId == projectId.Value);
+        }
 
         if (startDate.HasValue)
         {
@@ -173,9 +182,9 @@ public class ManagementAnalyticsService : IManagementAnalyticsService
         }
 
         return new ProjectProfitabilityDto(
-            project.Id,
-            project.Code,
-            project.Name,
+            project?.Id ?? Guid.Empty,
+            project?.Code ?? "ALL",
+            project?.Name ?? "All Projects (Company-wide)",
             startDate,
             endDate,
             totalLoggedHours,
@@ -239,14 +248,20 @@ public class ManagementAnalyticsService : IManagementAnalyticsService
     }
 
     public async Task<IReadOnlyList<SprintVelocityDto>> GetSprintVelocitiesAsync(
-        Guid projectId,
+        Guid? projectId = null,
         int sprintsCount = 5,
         CancellationToken ct = default)
     {
-        var workItems = await _dbContext.WorkItems
+        var query = _dbContext.WorkItems
             .AsNoTracking()
-            .Where(w => w.ProjectId == projectId && !string.IsNullOrWhiteSpace(w.SprintName))
-            .ToListAsync(ct);
+            .Where(w => !string.IsNullOrWhiteSpace(w.SprintName));
+
+        if (projectId.HasValue)
+        {
+            query = query.Where(w => w.ProjectId == projectId.Value);
+        }
+
+        var workItems = await query.ToListAsync(ct);
 
         var groups = workItems
             .GroupBy(w => w.SprintName!)
@@ -267,19 +282,26 @@ public class ManagementAnalyticsService : IManagementAnalyticsService
     }
 
     public Task<IReadOnlyList<SprintVelocityDto>> GetSprintVelocityAsync(
-        Guid projectId,
+        Guid? projectId = null,
         int sprintsCount = 5,
         CancellationToken ct = default)
         => GetSprintVelocitiesAsync(projectId, sprintsCount, ct);
 
     public async Task<IReadOnlyList<HoursComparisonDto>> GetHoursComparisonAsync(
-        Guid projectId,
+        Guid? projectId = null,
         CancellationToken ct = default)
     {
-        var workItems = await _dbContext.WorkItems
+        var query = _dbContext.WorkItems
             .AsNoTracking()
             .Include(w => w.TimeEntries.Where(t => !t.IsRunning))
-            .Where(w => w.ProjectId == projectId)
+            .AsQueryable();
+
+        if (projectId.HasValue)
+        {
+            query = query.Where(w => w.ProjectId == projectId.Value);
+        }
+
+        var workItems = await query
             .OrderBy(w => w.Code)
             .ToListAsync(ct);
 
@@ -315,13 +337,19 @@ public class ManagementAnalyticsService : IManagementAnalyticsService
     }
 
     public async Task<CompletionRateDto> GetCompletionRateAsync(
-        Guid projectId,
+        Guid? projectId = null,
         CancellationToken ct = default)
     {
-        var workItems = await _dbContext.WorkItems
+        var query = _dbContext.WorkItems
             .AsNoTracking()
-            .Where(w => w.ProjectId == projectId)
-            .ToListAsync(ct);
+            .AsQueryable();
+
+        if (projectId.HasValue)
+        {
+            query = query.Where(w => w.ProjectId == projectId.Value);
+        }
+
+        var workItems = await query.ToListAsync(ct);
 
         var totalWorkItems = workItems.Count;
         var completedWorkItems = workItems.Count(w => w.Status == WorkItemStatus.Done);
@@ -338,7 +366,7 @@ public class ManagementAnalyticsService : IManagementAnalyticsService
             .ToDictionary(g => g.Key, g => g.Count());
 
         return new CompletionRateDto(
-            projectId,
+            projectId ?? Guid.Empty,
             totalWorkItems,
             completedWorkItems,
             overallCompletionPercent,
@@ -348,14 +376,20 @@ public class ManagementAnalyticsService : IManagementAnalyticsService
     }
 
     public async Task<BurndownDto> GetSprintBurndownAsync(
-        Guid projectId,
+        Guid? projectId = null,
         string? sprintName = null,
         CancellationToken ct = default)
     {
-        var workItems = await _dbContext.WorkItems
+        var query = _dbContext.WorkItems
             .AsNoTracking()
-            .Where(w => w.ProjectId == projectId)
-            .ToListAsync(ct);
+            .AsQueryable();
+
+        if (projectId.HasValue)
+        {
+            query = query.Where(w => w.ProjectId == projectId.Value);
+        }
+
+        var workItems = await query.ToListAsync(ct);
 
         var targetSprint = sprintName;
         if (string.IsNullOrWhiteSpace(targetSprint))
@@ -396,7 +430,7 @@ public class ManagementAnalyticsService : IManagementAnalyticsService
         }
 
         return new BurndownDto(
-            projectId,
+            projectId ?? Guid.Empty,
             targetSprint,
             totalStoryPoints,
             totalEstimatedHours,
@@ -405,7 +439,7 @@ public class ManagementAnalyticsService : IManagementAnalyticsService
     }
 
     public Task<BurndownDto> GetBurndownAsync(
-        Guid projectId,
+        Guid? projectId = null,
         string? sprintName = null,
         CancellationToken ct = default)
         => GetSprintBurndownAsync(projectId, sprintName, ct);

@@ -71,4 +71,31 @@ public class DailyPlan : BaseEntity<Guid>
             IsSubmittedOnTime = localTime <= config.CutoffTimeLocal;
         }
     }
+
+    /// <summary>
+    /// Checks whether daily plan submission is permitted for the target PlanDate.
+    /// Submissions are strictly limited until 23:59:59 on the plan date.
+    /// </summary>
+    public bool IsSubmissionPermitted(PlanningCutoffConfig config, DateTimeOffset? submittedAtUtc = null)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+
+        var timestamp = submittedAtUtc ?? SubmittedAt;
+
+        TimeZoneInfo timeZone;
+        try
+        {
+            timeZone = TimeZoneInfo.FindSystemTimeZoneById(config.TimeZoneId);
+        }
+        catch
+        {
+            timeZone = TimeZoneInfo.Utc;
+        }
+
+        var localSubmittedAt = TimeZoneInfo.ConvertTime(timestamp, timeZone);
+        var localDate = DateOnly.FromDateTime(localSubmittedAt.DateTime);
+
+        // Disallow submissions for dates strictly before the local submission date (past 23:59:59)
+        return PlanDate == default || localDate <= PlanDate;
+    }
 }

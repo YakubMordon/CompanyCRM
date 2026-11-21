@@ -68,9 +68,9 @@ export const WeeklyPlanningTab: React.FC = () => {
   const loadPlans = useCallback(async () => {
     setIsLoading(true);
     try {
+      // Global weekly plans across the company
       const data = await planningApi.getWeeklyPlans({
         weekStartDate: currentMonday,
-        projectId: activeProject?.id,
       });
       setPlans(data);
 
@@ -119,7 +119,7 @@ export const WeeklyPlanningTab: React.FC = () => {
     try {
       const dto: CreateOrUpdateWeeklyPlanDto = {
         weekStartDate: currentMonday,
-        projectId: activeProject?.id || null,
+        projectId: null,
         goalsMarkdown: goalsMarkdown.trim(),
         focusAreasJson: focusAreasText.trim() || null,
         keyDeliverables: keyDeliverables.trim() || null,

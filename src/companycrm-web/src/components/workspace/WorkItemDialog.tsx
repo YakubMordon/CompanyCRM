@@ -17,12 +17,14 @@ import InputAdornment from '@mui/material/InputAdornment';
 import Box from '@mui/material/Box';
 import {
   CreateWorkItemDto,
+  ProjectDto,
   ProjectMemberDto,
   WorkItemDto,
   WorkItemPriority,
   WorkItemType,
 } from '../../types';
 import { projectsApi } from '../../services/projectsApi';
+import { useProject } from '../../contexts/ProjectContext';
 import { FormDialog } from '../common/FormDialog';
 import { workItemSchema, LIMITS } from '../../validation/schemas';
 import { getApiErrorMessage } from '../../validation/errorMessage';
@@ -31,7 +33,7 @@ interface WorkItemDialogProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (dto: CreateWorkItemDto, id?: string) => Promise<void>;
-  projectId: string;
+  projectId?: string;
   itemToEdit?: WorkItemDto | null;
 }
 
@@ -39,9 +41,11 @@ export const WorkItemDialog: React.FC<WorkItemDialogProps> = ({
   open,
   onClose,
   onSubmit,
-  projectId,
+  projectId: initialProjectId,
   itemToEdit,
 }) => {
+  const { projects } = useProject();
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(initialProjectId || '');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState<WorkItemType>('Task');
@@ -64,13 +68,22 @@ export const WorkItemDialog: React.FC<WorkItemDialogProps> = ({
   }>({});
 
   useEffect(() => {
-    if (projectId && open) {
+    if (initialProjectId) {
+      setSelectedProjectId(initialProjectId);
+    } else if (projects.length > 0 && !selectedProjectId) {
+      setSelectedProjectId(projects[0].id);
+    }
+  }, [initialProjectId, projects, selectedProjectId]);
+
+  useEffect(() => {
+    const activePid = itemToEdit?.projectId || selectedProjectId;
+    if (activePid && open) {
       projectsApi
-        .getProjectMembers(projectId)
+        .getProjectMembers(activePid)
         .then(setMembers)
         .catch(console.error);
     }
-  }, [projectId, open]);
+  }, [selectedProjectId, itemToEdit, open]);
 
   useEffect(() => {
     if (itemToEdit) {
@@ -136,8 +149,15 @@ export const WorkItemDialog: React.FC<WorkItemDialogProps> = ({
     setError(null);
 
     try {
+      const effectivePid = itemToEdit?.projectId || selectedProjectId;
+      if (!effectivePid) {
+        setError('Please select a project for this work item.');
+        setIsSubmitting(false);
+        return;
+      }
+
       const dto: CreateWorkItemDto = {
-        projectId,
+        projectId: effectivePid,
         title: title.trim(),
         description: description.trim() || null,
         type,
@@ -172,6 +192,25 @@ export const WorkItemDialog: React.FC<WorkItemDialogProps> = ({
           )}
 
           <Grid container spacing={2.5}>
+            {!itemToEdit && (
+              <Grid item xs={12}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Target Project</InputLabel>
+                  <Select
+                    value={selectedProjectId}
+                    label="Target Project"
+                    onChange={(e) => setSelectedProjectId(e.target.value)}
+                  >
+                    {projects.map((p) => (
+                      <MenuItem key={p.id} value={p.id}>
+                        {p.name} ({p.code})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            )}
+
             <Grid item xs={12}>
               <TextField
                 fullWidth

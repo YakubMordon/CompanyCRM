@@ -6,6 +6,7 @@ import Select, { SelectChangeEvent } from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import FolderIcon from '@mui/icons-material/Folder';
+import PublicIcon from '@mui/icons-material/Public';
 import AddIcon from '@mui/icons-material/Add';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
@@ -40,6 +41,10 @@ export const ProjectSelector: React.FC = () => {
 
   const handleChange = (event: SelectChangeEvent<string>) => {
     const selectedId = event.target.value;
+    if (selectedId === 'ALL' || selectedId === '') {
+      setActiveProject(null);
+      return;
+    }
     const found = projects.find((p) => p.id === selectedId) || null;
     setActiveProject(found);
   };
@@ -105,13 +110,41 @@ export const ProjectSelector: React.FC = () => {
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-      <Tooltip title={activeProject ? `Current Project: ${activeProject.name} (${activeProject.code})` : 'Select Active Project'}>
+      <Tooltip title={activeProject ? `Current Project: ${activeProject.name} (${activeProject.code})` : 'All Projects (Company-wide)'}>
         <FormControl size="small" sx={{ width: { xs: 180, sm: 260, md: 300 } }}>
           <Select
-            value={activeProject?.id || ''}
+            value={activeProject?.id || 'ALL'}
             onChange={handleChange}
             displayEmpty
             renderValue={(selectedId) => {
+              if (selectedId === 'ALL' || !selectedId) {
+                return (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, width: '100%', overflow: 'hidden' }}>
+                    <PublicIcon fontSize="small" color="secondary" sx={{ flexShrink: 0 }} />
+                    <Typography
+                      variant="body2"
+                      noWrap
+                      sx={{
+                        fontWeight: 700,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        flexGrow: 1,
+                        minWidth: 0,
+                      }}
+                    >
+                      All Projects (Overall)
+                    </Typography>
+                    <Chip
+                      label="GLOBAL"
+                      size="small"
+                      color="secondary"
+                      variant="outlined"
+                      sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700, flexShrink: 0 }}
+                    />
+                  </Box>
+                );
+              }
               const selectedProject = projects.find((p) => p.id === selectedId);
               if (!selectedProject) return <em>Select Project</em>;
               return (
@@ -160,6 +193,25 @@ export const ProjectSelector: React.FC = () => {
               },
             }}
           >
+            <MenuItem value="ALL" sx={{ maxWidth: '100%' }}>
+              <Tooltip title="View all company projects overall" placement="right">
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', minWidth: 0 }}>
+                  <PublicIcon fontSize="small" color="secondary" sx={{ flexShrink: 0 }} />
+                  <TruncatedText
+                    text="All Projects (Overall Company-wide)"
+                    variant="body2"
+                    sx={{ fontWeight: 700, flexGrow: 1, minWidth: 0 }}
+                  />
+                  <Chip
+                    label="GLOBAL"
+                    size="small"
+                    color="secondary"
+                    variant="outlined"
+                    sx={{ height: 18, fontSize: '0.65rem', fontWeight: 700, flexShrink: 0 }}
+                  />
+                </Box>
+              </Tooltip>
+            </MenuItem>
             {projects.map((project) => (
               <MenuItem key={project.id} value={project.id} sx={{ maxWidth: '100%' }}>
                 <Tooltip

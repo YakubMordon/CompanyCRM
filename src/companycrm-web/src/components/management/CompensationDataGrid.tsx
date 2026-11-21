@@ -109,6 +109,29 @@ export const CompensationDataGrid: React.FC = () => {
       field: 'jobTitle',
       headerName: 'Title',
       width: 170,
+      renderCell: (params: GridRenderCellParams<EmployeeCompensationDto>) => (
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            width: '100%',
+            height: '100%',
+            overflow: 'hidden',
+          }}
+        >
+          <Typography
+            variant="body2"
+            noWrap
+            title={params.value}
+            sx={{
+              fontWeight: 500,
+              lineHeight: 1.1,
+            }}
+          >
+            {params.value}
+          </Typography>
+        </Box>
+      ),
     },
     {
       field: 'role',

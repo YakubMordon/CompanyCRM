@@ -11,6 +11,7 @@ import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
 import { WorkItemDto } from '../../types';
 import { StatusChip } from '../common/StatusChip';
+import { TruncatedText } from '../common/TruncatedText';
 
 interface BacklogDataGridProps {
   workItems: WorkItemDto[];
@@ -48,8 +49,9 @@ export const BacklogDataGrid: React.FC<BacklogDataGridProps> = ({
       flex: 1,
       minWidth: 220,
       renderCell: (params: GridRenderCellParams<WorkItemDto>) => (
-        <Typography
+        <TruncatedText
           variant="body2"
+          text={params.value}
           sx={{
             fontWeight: 500,
             overflow: 'hidden',
@@ -58,9 +60,7 @@ export const BacklogDataGrid: React.FC<BacklogDataGridProps> = ({
             cursor: 'pointer',
           }}
           onClick={() => onRowClick(params.row)}
-        >
-          {params.value}
-        </Typography>
+        />
       ),
     },
     {
