@@ -29,7 +29,6 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar }) => {
         borderBottom: 1,
         borderColor: 'divider',
         bgcolor: 'background.paper',
-        zIndex: (theme) => theme.zIndex.drawer + 1,
       }}
     >
       <Toolbar sx={{ justifyContent: 'space-between', gap: 2, minHeight: 64, px: { xs: 1.5, sm: 3 } }}>

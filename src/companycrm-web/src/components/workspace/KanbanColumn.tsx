@@ -42,8 +42,9 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
       ref={setNodeRef}
       variant="outlined"
       sx={{
-        width: 290,
-        minWidth: 290,
+        flex: '1 1 260px',
+        minWidth: 260,
+        maxWidth: { md: 450, lg: 'none' },
         bgcolor: isOver ? 'action.hover' : 'background.paper',
         borderRadius: 2,
         display: 'flex',

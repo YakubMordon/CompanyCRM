@@ -31,6 +31,8 @@ public class CrmApiTestFixture : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        builder.UseSetting(WebHostDefaults.PreventHostingStartupKey, "true");
+        builder.UseSetting(WebHostDefaults.HostingStartupAssembliesKey, "");
 
         var baseDir = AppContext.BaseDirectory;
         var candidate = Path.GetFullPath(Path.Combine(baseDir, "../../../../src/CompanyCRM.Api"));

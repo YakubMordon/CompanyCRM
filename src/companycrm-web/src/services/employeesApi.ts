@@ -1,4 +1,11 @@
-import apiClient from './apiClient';
+import {
+  getApiEmployees,
+  getApiEmployeesIdProfile,
+  putApiEmployeesIdProfile,
+  getApiEmployeesIdSkills,
+  postApiEmployeesIdSkills,
+  deleteApiEmployeesIdSkillsSkillName,
+} from '../api/generated';
 import {
   EmployeeDirectoryDto,
   EmployeeProfileDto,
@@ -9,36 +16,29 @@ import {
 
 export const employeesApi = {
   getEmployees: async (search?: string, department?: string): Promise<EmployeeDirectoryDto[]> => {
-    const response = await apiClient.get<EmployeeDirectoryDto[]>('/employees', {
-      params: { search, department },
-    });
-    return response.data;
+    return (await getApiEmployees({ search, department })) as EmployeeDirectoryDto[];
   },
 
   getEmployeeProfile: async (id: string): Promise<EmployeeProfileDto> => {
-    const response = await apiClient.get<EmployeeProfileDto>(`/employees/${id}`);
-    return response.data;
+    return (await getApiEmployeesIdProfile(id)) as EmployeeProfileDto;
   },
 
   updateProfile: async (
     id: string,
     dto: UpdateProfileRequestDto
   ): Promise<EmployeeProfileDto> => {
-    const response = await apiClient.put<EmployeeProfileDto>(`/employees/${id}/profile`, dto);
-    return response.data;
+    return (await putApiEmployeesIdProfile(id, dto)) as EmployeeProfileDto;
   },
 
   getEmployeeSkills: async (id: string): Promise<EmployeeSkillDto[]> => {
-    const response = await apiClient.get<EmployeeSkillDto[]>(`/employees/${id}/skills`);
-    return response.data;
+    return (await getApiEmployeesIdSkills(id)) as EmployeeSkillDto[];
   },
 
   upsertSkill: async (id: string, dto: UpsertSkillRequestDto): Promise<EmployeeSkillDto> => {
-    const response = await apiClient.post<EmployeeSkillDto>(`/employees/${id}/skills`, dto);
-    return response.data;
+    return (await postApiEmployeesIdSkills(id, dto)) as EmployeeSkillDto;
   },
 
   deleteSkill: async (id: string, skillName: string): Promise<void> => {
-    await apiClient.delete(`/employees/${id}/skills/${encodeURIComponent(skillName)}`);
+    await deleteApiEmployeesIdSkillsSkillName(id, skillName);
   },
 };

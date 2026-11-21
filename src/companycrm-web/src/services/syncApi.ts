@@ -1,4 +1,9 @@
-import apiClient from './apiClient';
+import {
+  postApiSyncProjectsIdReconcile,
+  postApiSyncWorkitemsIdPush,
+  getApiSyncConflicts,
+  postApiSyncConflictsIdResolve,
+} from '../api/generated';
 import {
   ConflictResolutionResultDto,
   ReconciliationResultDto,
@@ -29,32 +34,22 @@ export function normalizeReconciliationResultDto(raw: any): ReconciliationResult
 
 export const syncApi = {
   reconcileProject: async (projectId: string): Promise<ReconciliationResultDto> => {
-    const response = await apiClient.post<ReconciliationResultDto>(
-      `/sync/projects/${projectId}/reconcile`
-    );
-    return normalizeReconciliationResultDto(response.data);
+    const rawData = await postApiSyncProjectsIdReconcile(projectId);
+    return normalizeReconciliationResultDto(rawData);
   },
 
   pushWorkItem: async (id: string): Promise<SyncResultDto> => {
-    const response = await apiClient.post<SyncResultDto>(`/sync/workitems/${id}/push`);
-    return response.data;
+    return (await postApiSyncWorkitemsIdPush(id)) as SyncResultDto;
   },
 
   getConflicts: async (projectId?: string): Promise<SyncConflictDto[]> => {
-    const response = await apiClient.get<SyncConflictDto[]>('/sync/conflicts', {
-      params: { projectId },
-    });
-    return response.data;
+    return (await getApiSyncConflicts({ projectId })) as SyncConflictDto[];
   },
 
   resolveConflict: async (
     conflictId: string,
     dto: ResolveConflictRequestDto
   ): Promise<ConflictResolutionResultDto> => {
-    const response = await apiClient.post<ConflictResolutionResultDto>(
-      `/sync/conflicts/${conflictId}/resolve`,
-      dto
-    );
-    return response.data;
+    return (await postApiSyncConflictsIdResolve(conflictId, dto)) as ConflictResolutionResultDto;
   },
 };

@@ -8,7 +8,6 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import Chip from '@mui/material/Chip';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import RateReviewIcon from '@mui/icons-material/RateReview';
 import SyncAltIcon from '@mui/icons-material/SyncAlt';
@@ -16,7 +15,6 @@ import PeopleIcon from '@mui/icons-material/People';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import AssessmentIcon from '@mui/icons-material/Assessment';
-import LockIcon from '@mui/icons-material/Lock';
 import { useAuth } from '../../contexts/AuthContext';
 
 export const SIDEBAR_WIDTH = 250;
@@ -25,7 +23,6 @@ interface NavItem {
   label: string;
   path: string;
   icon: React.ReactElement;
-  requiresHigherMgmt?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -35,12 +32,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Employees Directory', path: '/employees', icon: <PeopleIcon /> },
   { label: 'My Profile', path: '/profile', icon: <AccountCircleIcon /> },
   { label: 'Planning', path: '/planning', icon: <EventNoteIcon /> },
-  {
-    label: 'Management Portal',
-    path: '/management',
-    icon: <AssessmentIcon />,
-    requiresHigherMgmt: true,
-  },
+  { label: 'Management Portal', path: '/management', icon: <AssessmentIcon /> },
 ];
 
 interface SidebarProps {
@@ -50,8 +42,10 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
   const location = useLocation();
-  const { role } = useAuth();
-  const isHigherMgmt = role === 'HigherManagement';
+  const { role, canAccessPath } = useAuth();
+
+  // Filter items completely if user lacks permission for that page
+  const visibleNavItems = NAV_ITEMS.filter((item) => canAccessPath(item.path));
 
   const drawerContent = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -83,7 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
       </Box>
 
       <List sx={{ px: 1.5, flexGrow: 1 }}>
-        {NAV_ITEMS.map((item) => {
+        {visibleNavItems.map((item) => {
           const isActive =
             location.pathname === item.path ||
             (item.path === '/workspace' && location.pathname === '/');
@@ -126,16 +120,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
                     </Typography>
                   }
                 />
-                {item.requiresHigherMgmt && !isHigherMgmt && (
-                  <Chip
-                    icon={<LockIcon sx={{ fontSize: '12px !important' }} />}
-                    label="403"
-                    size="small"
-                    color="default"
-                    variant="outlined"
-                    sx={{ height: 20, fontSize: '0.65rem' }}
-                  />
-                )}
               </ListItemButton>
             </ListItem>
           );
@@ -154,7 +138,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
   );
 
   return (
-    <>
+    <Box
+      component="nav"
+      sx={{ width: { md: SIDEBAR_WIDTH }, flexShrink: { md: 0 } }}
+      aria-label="mailbox folders"
+    >
       {/* Mobile drawer */}
       <Drawer
         variant="temporary"
@@ -185,6 +173,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
       >
         {drawerContent}
       </Drawer>
-    </>
+    </Box>
   );
 };

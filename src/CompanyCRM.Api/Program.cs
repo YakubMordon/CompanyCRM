@@ -13,6 +13,32 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
+// Sanitize Visual Studio hosting startup assemblies that fail to execute under .NET 9
+var rawHostingStartups = Environment.GetEnvironmentVariable("ASPNETCORE_HOSTINGSTARTUPASSEMBLIES");
+if (!string.IsNullOrWhiteSpace(rawHostingStartups))
+{
+    var loadableAssemblies = rawHostingStartups
+        .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Where(name => !name.Equals("Microsoft.WebTools.ApiEndpointDiscovery", StringComparison.OrdinalIgnoreCase))
+        .Where(name =>
+        {
+            try
+            {
+                System.Reflection.Assembly.Load(new System.Reflection.AssemblyName(name));
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        })
+        .ToArray();
+
+    Environment.SetEnvironmentVariable(
+        "ASPNETCORE_HOSTINGSTARTUPASSEMBLIES",
+        loadableAssemblies.Length > 0 ? string.Join(';', loadableAssemblies) : null);
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Aspire Service Defaults (OpenTelemetry, HealthChecks, HTTP Resilience)

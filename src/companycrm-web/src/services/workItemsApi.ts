@@ -1,4 +1,15 @@
-import apiClient from './apiClient';
+import {
+  getApiWorkitems,
+  getApiWorkitemsId,
+  postApiWorkitems,
+  putApiWorkitemsId,
+  patchApiWorkitemsIdStatus,
+  postApiWorkitemsIdTimerStart,
+  postApiWorkitemsIdTimerStop,
+  getApiWorkitemsActiveTimer,
+  postApiWorkitemsIdTimeEntries,
+  getApiWorkitemsIdHistory,
+} from '../api/generated';
 import {
   CreateManualTimeEntryDto,
   CreateWorkItemDto,
@@ -43,61 +54,49 @@ export function normalizeWorkItemHistoryDto(raw: any): WorkItemHistoryDto {
 
 export const workItemsApi = {
   getWorkItems: async (params?: WorkItemQueryParams): Promise<PagedResult<WorkItemDto>> => {
-    const response = await apiClient.get<PagedResult<WorkItemDto>>('/workitems', {
-      params,
-    });
-    return response.data;
+    return (await getApiWorkitems(params as any)) as PagedResult<WorkItemDto>;
   },
 
   getWorkItemById: async (id: string): Promise<WorkItemDto> => {
-    const response = await apiClient.get<WorkItemDto>(`/workitems/${id}`);
-    return response.data;
+    return (await getApiWorkitemsId(id)) as WorkItemDto;
   },
 
   createWorkItem: async (dto: CreateWorkItemDto): Promise<WorkItemDto> => {
-    const response = await apiClient.post<WorkItemDto>('/workitems', dto);
-    return response.data;
+    return (await postApiWorkitems(dto as any)) as WorkItemDto;
   },
 
   updateWorkItem: async (id: string, dto: UpdateWorkItemDto): Promise<WorkItemDto> => {
-    const response = await apiClient.put<WorkItemDto>(`/workitems/${id}`, dto);
-    return response.data;
+    return (await putApiWorkitemsId(id, dto as any)) as WorkItemDto;
   },
 
   transitionStatus: async (id: string, dto: KanbanTransitionDto): Promise<WorkItemDto> => {
-    const response = await apiClient.patch<WorkItemDto>(`/workitems/${id}/status`, dto);
-    return response.data;
+    return (await patchApiWorkitemsIdStatus(id, dto)) as WorkItemDto;
   },
 
   startTimer: async (id: string, dto?: StartTimerRequestDto): Promise<TimeEntryDto> => {
-    const response = await apiClient.post<TimeEntryDto>(`/workitems/${id}/timer/start`, dto || {});
-    return response.data;
+    return (await postApiWorkitemsIdTimerStart(id, dto || {})) as TimeEntryDto;
   },
 
   stopTimer: async (id: string, dto?: StopTimerRequestDto): Promise<TimeEntryDto> => {
-    const response = await apiClient.post<TimeEntryDto>(`/workitems/${id}/timer/stop`, dto || {});
-    return response.data;
+    return (await postApiWorkitemsIdTimerStop(id, dto || {})) as TimeEntryDto;
   },
 
   getActiveTimer: async (): Promise<TimeEntryDto | null> => {
-    const response = await apiClient.get<TimeEntryDto | null>('/workitems/active-timer');
-    if (response.status === 204 || !response.data) {
-      return null;
-    }
-    return response.data;
+    const data = await getApiWorkitemsActiveTimer();
+    if (!data) return null;
+    return data as TimeEntryDto;
   },
 
   createManualTimeEntry: async (
     id: string,
     dto: CreateManualTimeEntryDto
   ): Promise<TimeEntryDto> => {
-    const response = await apiClient.post<TimeEntryDto>(`/workitems/${id}/time-entries`, dto);
-    return response.data;
+    return (await postApiWorkitemsIdTimeEntries(id, dto)) as TimeEntryDto;
   },
 
   getWorkItemHistory: async (id: string): Promise<WorkItemHistoryDto[]> => {
-    const response = await apiClient.get<WorkItemHistoryDto[]>(`/workitems/${id}/history`);
-    const items = Array.isArray(response.data) ? response.data : [];
+    const rawData = await getApiWorkitemsIdHistory(id);
+    const items = Array.isArray(rawData) ? rawData : [];
     return items.map(normalizeWorkItemHistoryDto);
   },
 };

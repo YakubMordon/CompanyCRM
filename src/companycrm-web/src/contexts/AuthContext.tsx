@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { AppRole, CurrentUserDto, LoginRequest } from '../types';
 import { authApi } from '../services/authApi';
+import { canAccessRoute } from './contextHelpers';
 
 interface AuthContextType {
   token: string | null;
@@ -10,6 +11,7 @@ interface AuthContextType {
   login: (request: LoginRequest) => Promise<void>;
   switchPersona: (targetRole: AppRole) => Promise<void>;
   logout: () => void;
+  canAccessPath: (path: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -111,6 +113,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [switchPersona]);
 
+  const canAccessPath = useCallback(
+    (path: string) => {
+      return canAccessRoute(role, currentUser?.permissions, path);
+    },
+    [role, currentUser?.permissions]
+  );
+
   return (
     <AuthContext.Provider
       value={{
@@ -121,6 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         switchPersona,
         logout,
+        canAccessPath,
       }}
     >
       {children}

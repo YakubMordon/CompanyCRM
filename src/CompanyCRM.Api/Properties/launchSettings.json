@@ -1,12 +1,14 @@
 {
-  "profiles": {
-    "CompanyCRM.Api": {
-      "commandName": "Project",
-      "launchBrowser": true,
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      },
-      "applicationUrl": "https://localhost:64568;http://localhost:64569"
-    }
-  }
+    "profiles":  {
+                     "CompanyCRM.Api":  {
+                                            "commandName":  "Project",
+                                            "launchBrowser":  true,
+                                            "environmentVariables":  {
+                                                                         "ASPNETCORE_ENVIRONMENT":  "Development",
+                                                                         "ASPNETCORE_HOSTINGSTARTUPASSEMBLIES":  "",
+                                                                         "ASPNETCORE_PREVENTHOSTINGSTARTUP":  "true"
+                                                                     },
+                                            "applicationUrl":  "https://localhost:64568;http://localhost:64569"
+                                        }
+                 }
 }

@@ -1,4 +1,9 @@
-import apiClient from './apiClient';
+import {
+  getApiReviewsQueue,
+  postApiReviewsIdApprove,
+  postApiReviewsIdClarify,
+  postApiReviewsIdDeny,
+} from '../api/generated';
 import {
   ApproveReviewRequestDto,
   ClarifyReviewRequestDto,
@@ -57,10 +62,8 @@ export const reviewsApi = {
     projectId?: string,
     assignedToMeOnly = false
   ): Promise<WorkItemReviewQueueDto[]> => {
-    const response = await apiClient.get<any[]>('/reviews/queue', {
-      params: { projectId, assignedToMeOnly },
-    });
-    const items = Array.isArray(response.data) ? response.data : [];
+    const rawData = await getApiReviewsQueue({ projectId, assignedToMeOnly });
+    const items = Array.isArray(rawData) ? rawData : [];
     return items.map(normalizeWorkItemReviewQueueDto);
   },
 
@@ -68,8 +71,7 @@ export const reviewsApi = {
     if (!id || id === 'undefined') {
       throw new Error('Valid review work item ID is required to approve review.');
     }
-    const response = await apiClient.post<WorkItemDto>(`/reviews/${id}/approve`, dto || {});
-    return response.data;
+    return (await postApiReviewsIdApprove(id, dto || {})) as WorkItemDto;
   },
 
   requestClarification: async (
@@ -79,15 +81,13 @@ export const reviewsApi = {
     if (!id || id === 'undefined') {
       throw new Error('Valid review work item ID is required to request clarification.');
     }
-    const response = await apiClient.post<WorkItemDto>(`/reviews/${id}/clarify`, dto);
-    return response.data;
+    return (await postApiReviewsIdClarify(id, dto)) as WorkItemDto;
   },
 
   denyReview: async (id: string, dto: DenyReviewRequestDto): Promise<WorkItemDto> => {
     if (!id || id === 'undefined') {
       throw new Error('Valid review work item ID is required to deny review.');
     }
-    const response = await apiClient.post<WorkItemDto>(`/reviews/${id}/deny`, dto);
-    return response.data;
+    return (await postApiReviewsIdDeny(id, dto)) as WorkItemDto;
   },
 };

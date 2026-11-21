@@ -14,7 +14,13 @@ import SearchIcon from '@mui/icons-material/Search';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
-import { CreateWorkItemDto, TimeEntryDto, UpdateWorkItemDto, WorkItemDto, WorkItemStatus } from '../types';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import StopIcon from '@mui/icons-material/Stop';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import Divider from '@mui/material/Divider';
+import Chip from '@mui/material/Chip';
+import Paper from '@mui/material/Paper';
+import { CreateWorkItemDto, TimeEntryDto, UpdateWorkItemDto, WorkItemDto, WorkItemPriority, WorkItemStatus, WorkItemType } from '../types';
 import { workItemsApi } from '../services/workItemsApi';
 import { useProject } from '../contexts/ProjectContext';
 import { useSignalR } from '../contexts/SignalRContext';
@@ -32,6 +38,8 @@ export const WorkspacePage: React.FC = () => {
   const [workItems, setWorkItems] = useState<WorkItemDto[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('ALL');
+  const [selectedPriorityFilter, setSelectedPriorityFilter] = useState<string>('ALL');
 
   // Dialog & Drawer state
   const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
@@ -162,15 +170,24 @@ export const WorkspacePage: React.FC = () => {
   };
 
   const filteredItems = useMemo(() => {
-    if (!searchQuery.trim()) return workItems;
-    const q = searchQuery.toLowerCase();
-    return workItems.filter(
-      (item) =>
-        item.code.toLowerCase().includes(q) ||
-        item.title.toLowerCase().includes(q) ||
-        (item.assigneeName && item.assigneeName.toLowerCase().includes(q))
-    );
-  }, [workItems, searchQuery]);
+    return workItems.filter((item) => {
+      if (selectedTypeFilter !== 'ALL' && item.type !== selectedTypeFilter) {
+        return false;
+      }
+      if (selectedPriorityFilter !== 'ALL' && item.priority !== selectedPriorityFilter) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesQuery =
+          item.code.toLowerCase().includes(q) ||
+          item.title.toLowerCase().includes(q) ||
+          (item.assigneeName && item.assigneeName.toLowerCase().includes(q));
+        if (!matchesQuery) return false;
+      }
+      return true;
+    });
+  }, [workItems, searchQuery, selectedTypeFilter, selectedPriorityFilter]);
 
   if (!activeProject) {
     return (
@@ -257,6 +274,107 @@ export const WorkspacePage: React.FC = () => {
         </Box>
       </Box>
 
+      {/* Active Timer Banner */}
+      {activeTimer && activeTimer.isRunning && (
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 1.5,
+            px: 2,
+            bgcolor: 'primary.main',
+            color: 'primary.contrastText',
+            borderRadius: 2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 1.5,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <AccessTimeIcon />
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              Live timer running for work item {activeTimer.workItemCode || activeTimer.workItemId}
+            </Typography>
+            <Chip
+              label={activeTimer.isBillable ? 'Billable' : 'Non-Billable'}
+              size="small"
+              sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'inherit', fontWeight: 600 }}
+            />
+          </Box>
+          <Button
+            size="small"
+            variant="contained"
+            color="secondary"
+            startIcon={<StopIcon />}
+            onClick={async () => {
+              try {
+                await workItemsApi.stopTimer(activeTimer.workItemId, { isBillable: true });
+                fetchActiveTimer();
+                loadWorkItems();
+              } catch (err) {
+                console.error('Failed to stop timer:', err);
+              }
+            }}
+            sx={{ fontWeight: 700 }}
+          >
+            Stop Timer
+          </Button>
+        </Paper>
+      )}
+
+      {/* Filter Row */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', mr: 0.5 }}>
+          Type:
+        </Typography>
+        {(['ALL', 'Bug', 'Feature', 'Task', 'Improvement'] as const).map((t) => (
+          <Chip
+            key={t}
+            label={t}
+            size="small"
+            clickable
+            color={selectedTypeFilter === t ? 'primary' : 'default'}
+            variant={selectedTypeFilter === t ? 'filled' : 'outlined'}
+            onClick={() => setSelectedTypeFilter(t)}
+            sx={{ fontWeight: 600 }}
+          />
+        ))}
+
+        <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
+
+        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', mr: 0.5 }}>
+          Priority:
+        </Typography>
+        {(['ALL', 'Low', 'Medium', 'High', 'Critical'] as const).map((p) => (
+          <Chip
+            key={p}
+            label={p}
+            size="small"
+            clickable
+            color={selectedPriorityFilter === p ? 'primary' : 'default'}
+            variant={selectedPriorityFilter === p ? 'filled' : 'outlined'}
+            onClick={() => setSelectedPriorityFilter(p)}
+            sx={{ fontWeight: 600 }}
+          />
+        ))}
+
+        {(selectedTypeFilter !== 'ALL' || selectedPriorityFilter !== 'ALL' || searchQuery) && (
+          <Button
+            size="small"
+            variant="text"
+            onClick={() => {
+              setSelectedTypeFilter('ALL');
+              setSelectedPriorityFilter('ALL');
+              setSearchQuery('');
+            }}
+            sx={{ fontSize: '0.75rem', textTransform: 'none', ml: 'auto' }}
+          >
+            Clear Filters
+          </Button>
+        )}
+      </Box>
+
       {/* Main Content Area */}
       {isLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 8 }}>
@@ -296,6 +414,10 @@ export const WorkspacePage: React.FC = () => {
         onItemUpdated={(updated) => {
           setSelectedDrawerItem(updated);
           setWorkItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+        }}
+        onEditItem={(item) => {
+          setEditingItem(item);
+          setIsDialogOpen(true);
         }}
         activeTimer={activeTimer}
         onRefreshActiveTimer={fetchActiveTimer}

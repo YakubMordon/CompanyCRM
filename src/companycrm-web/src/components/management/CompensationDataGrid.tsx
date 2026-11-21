@@ -7,6 +7,7 @@ import Grid from '@mui/material/Grid';
 import LinearProgress from '@mui/material/LinearProgress';
 import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
+import { alpha } from '@mui/material/styles';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
@@ -177,7 +178,7 @@ export const CompensationDataGrid: React.FC = () => {
         <Grid item xs={12} sm={4}>
           <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Avatar sx={{ bgcolor: 'primary.lighter', color: 'primary.main' }}>
+              <Avatar sx={{ bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12), color: 'primary.main' }}>
                 <AttachMoneyIcon />
               </Avatar>
               <Box>
@@ -195,7 +196,7 @@ export const CompensationDataGrid: React.FC = () => {
         <Grid item xs={12} sm={4}>
           <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Avatar sx={{ bgcolor: 'success.lighter', color: 'success.main' }}>
+              <Avatar sx={{ bgcolor: (theme) => alpha(theme.palette.success.main, 0.12), color: 'success.main' }}>
                 <TrendingUpIcon />
               </Avatar>
               <Box>
@@ -213,7 +214,7 @@ export const CompensationDataGrid: React.FC = () => {
         <Grid item xs={12} sm={4}>
           <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Avatar sx={{ bgcolor: 'info.lighter', color: 'info.main' }}>
+              <Avatar sx={{ bgcolor: (theme) => alpha(theme.palette.info.main, 0.12), color: 'info.main' }}>
                 <AssignmentTurnedInIcon />
               </Avatar>
               <Box>

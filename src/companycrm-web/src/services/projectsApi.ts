@@ -1,4 +1,14 @@
-import apiClient from './apiClient';
+import {
+  getApiProjects,
+  getApiProjectsId,
+  postApiProjects,
+  putApiProjectsId,
+  getApiProjectsIdMembers,
+  postApiProjectsIdMembers,
+  deleteApiProjectsIdMembersEmployeeId,
+  getApiProjectsIdExternalConfig,
+  putApiProjectsIdExternalConfig,
+} from '../api/generated';
 import {
   AddProjectMemberDto,
   CreateProjectDto,
@@ -11,54 +21,41 @@ import {
 
 export const projectsApi = {
   getProjects: async (includeInactive = false): Promise<ProjectDto[]> => {
-    const response = await apiClient.get<ProjectDto[]>('/projects', {
-      params: { includeInactive },
-    });
-    return response.data;
+    return (await getApiProjects({ includeInactive })) as ProjectDto[];
   },
 
   getProjectById: async (id: string): Promise<ProjectDto> => {
-    const response = await apiClient.get<ProjectDto>(`/projects/${id}`);
-    return response.data;
+    return (await getApiProjectsId(id)) as ProjectDto;
   },
 
   createProject: async (dto: CreateProjectDto): Promise<ProjectDto> => {
-    const response = await apiClient.post<ProjectDto>('/projects', dto);
-    return response.data;
+    return (await postApiProjects(dto)) as ProjectDto;
   },
 
   updateProject: async (id: string, dto: UpdateProjectDto): Promise<ProjectDto> => {
-    const response = await apiClient.put<ProjectDto>(`/projects/${id}`, dto);
-    return response.data;
+    return (await putApiProjectsId(id, dto)) as ProjectDto;
   },
 
   getProjectMembers: async (id: string): Promise<ProjectMemberDto[]> => {
-    const response = await apiClient.get<ProjectMemberDto[]>(`/projects/${id}/members`);
-    return response.data;
+    return (await getApiProjectsIdMembers(id)) as ProjectMemberDto[];
   },
 
   addProjectMember: async (id: string, dto: AddProjectMemberDto): Promise<ProjectMemberDto> => {
-    const response = await apiClient.post<ProjectMemberDto>(`/projects/${id}/members`, dto);
-    return response.data;
+    return (await postApiProjectsIdMembers(id, dto)) as ProjectMemberDto;
   },
 
   removeProjectMember: async (id: string, employeeId: string): Promise<void> => {
-    await apiClient.delete(`/projects/${id}/members/${employeeId}`);
+    await deleteApiProjectsIdMembersEmployeeId(id, employeeId);
   },
 
   getExternalConfig: async (id: string): Promise<ProjectExternalConfigDto> => {
-    const response = await apiClient.get<ProjectExternalConfigDto>(`/projects/${id}/external-config`);
-    return response.data;
+    return (await getApiProjectsIdExternalConfig(id)) as ProjectExternalConfigDto;
   },
 
   updateExternalConfig: async (
     id: string,
     dto: UpdateProjectExternalConfigDto
   ): Promise<ProjectExternalConfigDto> => {
-    const response = await apiClient.put<ProjectExternalConfigDto>(
-      `/projects/${id}/external-config`,
-      dto
-    );
-    return response.data;
+    return (await putApiProjectsIdExternalConfig(id, dto)) as ProjectExternalConfigDto;
   },
 };

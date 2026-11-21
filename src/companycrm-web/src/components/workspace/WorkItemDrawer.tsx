@@ -17,6 +17,9 @@ import StopIcon from '@mui/icons-material/Stop';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import HistoryIcon from '@mui/icons-material/History';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import EditIcon from '@mui/icons-material/Edit';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import {
   CreateManualTimeEntryDto,
@@ -25,6 +28,7 @@ import {
   WorkItemHistoryDto,
 } from '../../types';
 import { workItemsApi } from '../../services/workItemsApi';
+import { syncApi } from '../../services/syncApi';
 import { StatusChip } from '../common/StatusChip';
 import { getHistoryActionLabel, getHistoryNote } from './workItemHelpers';
 
@@ -33,6 +37,7 @@ interface WorkItemDrawerProps {
   open: boolean;
   onClose: () => void;
   onItemUpdated: (item: WorkItemDto) => void;
+  onEditItem?: (item: WorkItemDto) => void;
   activeTimer: TimeEntryDto | null;
   onRefreshActiveTimer: () => void;
 }
@@ -42,11 +47,14 @@ export const WorkItemDrawer: React.FC<WorkItemDrawerProps> = ({
   open,
   onClose,
   onItemUpdated,
+  onEditItem,
   activeTimer,
   onRefreshActiveTimer,
 }) => {
   const [history, setHistory] = useState<WorkItemHistoryDto[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isPushingAdo, setIsPushingAdo] = useState(false);
+  const [pushStatusMessage, setPushStatusMessage] = useState<string | null>(null);
 
   // Live timer state
   const isCurrentItemRunning = Boolean(
@@ -198,9 +206,25 @@ export const WorkItemDrawer: React.FC<WorkItemDrawerProps> = ({
           <StatusChip type={item.type} />
           <StatusChip status={item.status} />
         </Box>
-        <IconButton onClick={onClose} size="small">
-          <CloseIcon />
-        </IconButton>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          {onEditItem && (
+            <Button
+              size="small"
+              startIcon={<EditIcon />}
+              onClick={() => {
+                onEditItem(item);
+                onClose();
+              }}
+              variant="outlined"
+              sx={{ mr: 1 }}
+            >
+              Edit
+            </Button>
+          )}
+          <IconButton onClick={onClose} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Box>
       </Box>
 
       <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
@@ -246,7 +270,45 @@ export const WorkItemDrawer: React.FC<WorkItemDrawerProps> = ({
             variant="outlined"
           />
         )}
+        <Button
+          size="small"
+          variant="outlined"
+          color="secondary"
+          startIcon={isPushingAdo ? <CircularProgress size={14} color="inherit" /> : <CloudUploadIcon />}
+          disabled={isPushingAdo}
+          onClick={async () => {
+            try {
+              setIsPushingAdo(true);
+              setPushStatusMessage(null);
+              const result = await syncApi.pushWorkItem(item.id);
+              if (result.success || result.isSuccess) {
+                setPushStatusMessage(`Pushed to ADO (${result.externalId || 'synced'})`);
+                const updated = await workItemsApi.getWorkItemById(item.id);
+                onItemUpdated(updated);
+              } else {
+                setPushStatusMessage(result.message || result.errorMessage || 'Push failed');
+              }
+            } catch (err: any) {
+              setPushStatusMessage(err?.response?.data?.detail || err?.message || 'Push to ADO failed');
+            } finally {
+              setIsPushingAdo(false);
+            }
+          }}
+          sx={{ height: 24, fontSize: '0.75rem', textTransform: 'none' }}
+        >
+          {isPushingAdo ? 'Pushing...' : 'Push to ADO'}
+        </Button>
       </Box>
+
+      {pushStatusMessage && (
+        <Alert
+          severity={pushStatusMessage.includes('Pushed') ? 'success' : 'error'}
+          onClose={() => setPushStatusMessage(null)}
+          sx={{ mb: 2 }}
+        >
+          {pushStatusMessage}
+        </Alert>
+      )}
 
       <Divider sx={{ my: 2 }} />
 

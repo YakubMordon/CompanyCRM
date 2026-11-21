@@ -6,6 +6,7 @@ import Button from '@mui/material/Button';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import PersonSwitchIcon from '@mui/icons-material/SwitchAccount';
 import Alert from '@mui/material/Alert';
+import { alpha } from '@mui/material/styles';
 import { useAuth } from '../../contexts/AuthContext';
 
 export const ForbiddenView: React.FC = () => {
@@ -38,7 +39,7 @@ export const ForbiddenView: React.FC = () => {
             width: 80,
             height: 80,
             borderRadius: '50%',
-            bgcolor: 'error.lighter',
+            bgcolor: (theme) => alpha(theme.palette.error.main, 0.12),
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

@@ -1,4 +1,11 @@
-import apiClient from './apiClient';
+import {
+  getApiManagementCompensation,
+  getApiManagementProfitability,
+  getApiManagementAnalyticsVelocity,
+  getApiManagementAnalyticsHoursComparison,
+  getApiManagementAnalyticsCompletionRates,
+  getApiManagementAnalyticsBurndown,
+} from '../api/generated';
 import {
   BurndownDto,
   CompletionRateDto,
@@ -10,8 +17,7 @@ import {
 
 export const managementApi = {
   getCompensation: async (): Promise<EmployeeCompensationDto[]> => {
-    const response = await apiClient.get<EmployeeCompensationDto[]>('/management/compensation');
-    return response.data;
+    return (await getApiManagementCompensation()) as EmployeeCompensationDto[];
   },
 
   getProfitability: async (
@@ -19,58 +25,42 @@ export const managementApi = {
     startDate?: string,
     endDate?: string
   ): Promise<ProjectProfitabilityDto> => {
-    const response = await apiClient.get<ProjectProfitabilityDto>(
-      '/management/profitability',
-      {
-        params: { projectId, startDate, endDate },
-      }
-    );
-    return response.data;
+    return (await getApiManagementProfitability({
+      projectId,
+      startDate,
+      endDate,
+    })) as ProjectProfitabilityDto;
   },
 
   getVelocity: async (
     projectId: string,
     sprintsCount = 5
   ): Promise<SprintVelocityDto[]> => {
-    const response = await apiClient.get<SprintVelocityDto[]>(
-      '/management/analytics/velocity',
-      {
-        params: { projectId, sprintsCount },
-      }
-    );
-    return response.data;
+    return (await getApiManagementAnalyticsVelocity({
+      projectId,
+      sprintsCount,
+    })) as SprintVelocityDto[];
   },
 
   getHoursComparison: async (projectId: string): Promise<HoursComparisonDto[]> => {
-    const response = await apiClient.get<HoursComparisonDto[]>(
-      '/management/analytics/hours-comparison',
-      {
-        params: { projectId },
-      }
-    );
-    return response.data;
+    return (await getApiManagementAnalyticsHoursComparison({
+      projectId,
+    })) as HoursComparisonDto[];
   },
 
   getCompletionRates: async (projectId: string): Promise<CompletionRateDto> => {
-    const response = await apiClient.get<CompletionRateDto>(
-      '/management/analytics/completion-rates',
-      {
-        params: { projectId },
-      }
-    );
-    return response.data;
+    return (await getApiManagementAnalyticsCompletionRates({
+      projectId,
+    })) as CompletionRateDto;
   },
 
   getBurndown: async (
     projectId: string,
     sprintName?: string
   ): Promise<BurndownDto> => {
-    const response = await apiClient.get<BurndownDto>(
-      '/management/analytics/burndown',
-      {
-        params: { projectId, sprintName },
-      }
-    );
-    return response.data;
+    return (await getApiManagementAnalyticsBurndown({
+      projectId,
+      sprintName,
+    })) as BurndownDto;
   },
 };
