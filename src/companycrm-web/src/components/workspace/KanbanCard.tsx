@@ -164,7 +164,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ item, onClick, isRunning
             </Tooltip>
           ) : (
             <Typography variant="caption" color="text.secondary">
-              Unassigned
+              N/A
             </Typography>
           )}
         </Box>
