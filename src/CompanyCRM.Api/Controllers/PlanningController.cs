@@ -6,11 +6,9 @@ using CompanyCRM.Application.Interfaces;
 using CompanyCRM.Domain.Entities;
 using CompanyCRM.Domain.Enums;
 using CompanyCRM.Infrastructure.BackgroundJobs;
-using CompanyCRM.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
 
 namespace CompanyCRM.Api.Controllers;
 
@@ -19,16 +17,25 @@ namespace CompanyCRM.Api.Controllers;
 [Authorize]
 public class PlanningController : ControllerBase
 {
-    private readonly CrmDbContext _dbContext;
+    private readonly IPlanningRepository _planningRepository;
+    private readonly IWorkItemRepository _workItemRepository;
+    private readonly IProjectRepository _projectRepository;
+    private readonly IEmployeeRepository _employeeRepository;
     private readonly IPlanningCutoffJob _cutoffJob;
     private readonly IHubContext<CrmHub, ICrmHubClient> _hubContext;
 
     public PlanningController(
-        CrmDbContext dbContext,
+        IPlanningRepository planningRepository,
+        IWorkItemRepository workItemRepository,
+        IProjectRepository projectRepository,
+        IEmployeeRepository employeeRepository,
         IPlanningCutoffJob cutoffJob,
         IHubContext<CrmHub, ICrmHubClient> hubContext)
     {
-        _dbContext = dbContext;
+        _planningRepository = planningRepository;
+        _workItemRepository = workItemRepository;
+        _projectRepository = projectRepository;
+        _employeeRepository = employeeRepository;
         _cutoffJob = cutoffJob;
         _hubContext = hubContext;
     }
@@ -47,29 +54,11 @@ public class PlanningController : ControllerBase
         [FromQuery] Guid? employeeId,
         CancellationToken ct = default)
     {
-        var query = _dbContext.WeeklyPlans
-            .AsNoTracking()
-            .Include(wp => wp.Employee)
-            .Include(wp => wp.Project)
-            .AsQueryable();
+        DateOnly? normalizedMonday = weekStartDate.HasValue
+            ? WeeklyPlan.NormalizeToMonday(weekStartDate.Value)
+            : null;
 
-        if (weekStartDate.HasValue)
-        {
-            var normalizedMonday = WeeklyPlan.NormalizeToMonday(weekStartDate.Value);
-            query = query.Where(wp => wp.WeekStartDate == normalizedMonday);
-        }
-
-        if (projectId.HasValue)
-        {
-            query = query.Where(wp => wp.ProjectId == projectId.Value);
-        }
-
-        if (employeeId.HasValue)
-        {
-            query = query.Where(wp => wp.EmployeeId == employeeId.Value);
-        }
-
-        var plans = await query.OrderByDescending(wp => wp.WeekStartDate).ToListAsync(ct);
+        var plans = await _planningRepository.GetWeeklyPlansAsync(normalizedMonday, projectId, employeeId, ct);
 
         var result = plans.Select(wp => new WeeklyPlanDto(
             wp.Id,
@@ -97,12 +86,7 @@ public class PlanningController : ControllerBase
         var callerId = GetCallerId();
         var normalizedMonday = WeeklyPlan.NormalizeToMonday(request.WeekStartDate);
 
-        var plan = await _dbContext.WeeklyPlans
-            .Include(wp => wp.Employee)
-            .Include(wp => wp.Project)
-            .FirstOrDefaultAsync(wp =>
-                wp.EmployeeId == callerId &&
-                wp.WeekStartDate == normalizedMonday, ct);
+        var plan = await _planningRepository.GetWeeklyPlanByEmployeeAndWeekAsync(callerId, normalizedMonday, trackChanges: true, ct);
 
         if (plan == null)
         {
@@ -118,7 +102,7 @@ public class PlanningController : ControllerBase
                 CreatedAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow
             };
-            _dbContext.WeeklyPlans.Add(plan);
+            _planningRepository.AddWeeklyPlan(plan);
         }
         else
         {
@@ -130,13 +114,13 @@ public class PlanningController : ControllerBase
             plan.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
-        await _dbContext.SaveChangesAsync(ct);
+        await _planningRepository.SaveChangesAsync(ct);
 
-        var caller = await _dbContext.Employees.FindAsync(new object[] { callerId }, ct);
+        var caller = await _employeeRepository.GetByIdAsync(callerId, ct);
         string? projectName = null;
         if (request.ProjectId.HasValue)
         {
-            var p = await _dbContext.Projects.FindAsync(new object[] { request.ProjectId.Value }, ct);
+            var p = await _projectRepository.GetByIdAsync(request.ProjectId.Value, trackChanges: false, ct);
             projectName = p?.Name;
         }
 
@@ -164,24 +148,7 @@ public class PlanningController : ControllerBase
         [FromQuery] Guid? employeeId,
         CancellationToken ct = default)
     {
-        var query = _dbContext.DailyPlans
-            .AsNoTracking()
-            .Include(dp => dp.Employee)
-            .Include(dp => dp.Items)
-                .ThenInclude(dpi => dpi.WorkItem)
-            .AsQueryable();
-
-        if (date.HasValue)
-        {
-            query = query.Where(dp => dp.PlanDate == date.Value);
-        }
-
-        if (employeeId.HasValue)
-        {
-            query = query.Where(dp => dp.EmployeeId == employeeId.Value);
-        }
-
-        var plans = await query.OrderByDescending(dp => dp.PlanDate).ToListAsync(ct);
+        var plans = await _planningRepository.GetDailyPlansAsync(date, employeeId, ct);
 
         var result = plans.Select(dp => new DailyPlanDto(
             dp.Id,
@@ -237,12 +204,7 @@ public class PlanningController : ControllerBase
 
         if (workItemIds.Count > 0)
         {
-            var linkedProjectIds = await _dbContext.WorkItems
-                .AsNoTracking()
-                .Where(w => workItemIds.Contains(w.Id))
-                .Select(w => w.ProjectId)
-                .Distinct()
-                .ToListAsync(ct);
+            var linkedProjectIds = await _workItemRepository.GetDistinctProjectIdsByWorkItemIdsAsync(workItemIds, ct);
 
             if (linkedProjectIds.Count == 1)
             {
@@ -254,12 +216,7 @@ public class PlanningController : ControllerBase
             }
             else if (linkedProjectIds.Count > 1)
             {
-                targetProjectId = await _dbContext.PlanningCutoffConfigs
-                    .AsNoTracking()
-                    .Where(c => c.ProjectId.HasValue && linkedProjectIds.Contains(c.ProjectId.Value))
-                    .OrderBy(c => c.ProjectId)
-                    .Select(c => c.ProjectId)
-                    .FirstOrDefaultAsync(ct);
+                targetProjectId = await _planningRepository.GetFirstConfiguredCutoffProjectIdAsync(linkedProjectIds, ct);
             }
         }
 
@@ -268,14 +225,10 @@ public class PlanningController : ControllerBase
         PlanningCutoffConfig? cutoffConfig = null;
         if (targetProjectId.HasValue)
         {
-            cutoffConfig = await _dbContext.PlanningCutoffConfigs
-                .AsNoTracking()
-                .FirstOrDefaultAsync(c => c.ProjectId == targetProjectId.Value, ct);
+            cutoffConfig = await _planningRepository.GetCutoffConfigAsync(targetProjectId.Value, trackChanges: false, ct);
         }
 
-        cutoffConfig ??= await _dbContext.PlanningCutoffConfigs
-            .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.ProjectId == null, ct)
+        cutoffConfig ??= await _planningRepository.GetCutoffConfigAsync(null, trackChanges: false, ct)
             ?? new PlanningCutoffConfig
             {
                 CutoffTimeLocal = new TimeOnly(11, 0),
@@ -296,9 +249,7 @@ public class PlanningController : ControllerBase
             return BadRequest(new { message = $"Daily plan check-ins for {request.PlanDate} are closed. Submissions are strictly limited until 23:59 on the plan date." });
         }
 
-        var dailyPlan = await _dbContext.DailyPlans
-            .Include(dp => dp.Items)
-            .FirstOrDefaultAsync(dp => dp.EmployeeId == callerId && dp.PlanDate == request.PlanDate, ct);
+        var dailyPlan = await _planningRepository.GetDailyPlanByEmployeeAndDateAsync(callerId, request.PlanDate, trackChanges: true, ct);
 
         if (dailyPlan == null)
         {
@@ -311,7 +262,7 @@ public class PlanningController : ControllerBase
                 SummaryNotes = request.SummaryNotes?.Trim()
             };
             dailyPlan.EvaluateSubmissionTiming(cutoffConfig, now);
-            _dbContext.DailyPlans.Add(dailyPlan);
+            _planningRepository.AddDailyPlan(dailyPlan);
         }
         else
         {
@@ -323,11 +274,7 @@ public class PlanningController : ControllerBase
             {
                 dailyPlan.EvaluateSubmissionTiming(cutoffConfig, now);
             }
-            if (dailyPlan.Items.Count > 0)
-            {
-                _dbContext.DailyPlanItems.RemoveRange(dailyPlan.Items.ToList());
-                dailyPlan.Items.Clear();
-            }
+            _planningRepository.ClearDailyPlanItems(dailyPlan);
         }
 
         if (request.Items != null)
@@ -343,13 +290,13 @@ public class PlanningController : ControllerBase
                     PlannedHours = item.PlannedHours,
                     GoalNote = item.GoalNote?.Trim()
                 };
-                _dbContext.DailyPlanItems.Add(planItem);
+                _planningRepository.AddDailyPlanItem(planItem);
             }
         }
 
-        await _dbContext.SaveChangesAsync(ct);
+        await _planningRepository.SaveChangesAsync(ct);
 
-        var caller = await _dbContext.Employees.FindAsync(new object[] { callerId }, ct);
+        var caller = await _employeeRepository.GetByIdAsync(callerId, ct);
 
         await _hubContext.Clients.All.DailyPlanSubmitted(new DailyPlanSubmittedDto(
             callerId,
@@ -361,14 +308,10 @@ public class PlanningController : ControllerBase
         ));
 
         // Re-query with includes for response
-        var reloadedPlan = await _dbContext.DailyPlans
-            .AsNoTracking()
-            .Include(dp => dp.Items)
-                .ThenInclude(dpi => dpi.WorkItem)
-            .FirstAsync(dp => dp.Id == dailyPlan.Id, ct);
+        var reloadedPlan = await _planningRepository.GetDailyPlanByIdWithDetailsAsync(dailyPlan.Id, ct);
 
         var dto = new DailyPlanDto(
-            reloadedPlan.Id,
+            reloadedPlan!.Id,
             reloadedPlan.EmployeeId,
             caller?.FullName ?? "Employee",
             reloadedPlan.PlanDate,
@@ -397,18 +340,12 @@ public class PlanningController : ControllerBase
         [FromQuery] Guid? projectId,
         CancellationToken ct)
     {
-        var config = await _dbContext.PlanningCutoffConfigs
-            .AsNoTracking()
-            .Include(c => c.Project)
-            .FirstOrDefaultAsync(c => c.ProjectId == projectId, ct);
+        var config = await _planningRepository.GetCutoffConfigAsync(projectId, trackChanges: false, ct);
 
         if (config == null)
         {
             // Global default fallback
-            config = await _dbContext.PlanningCutoffConfigs
-                .AsNoTracking()
-                .Include(c => c.Project)
-                .FirstOrDefaultAsync(c => c.ProjectId == null, ct);
+            config = await _planningRepository.GetCutoffConfigAsync(null, trackChanges: false, ct);
         }
 
         if (config == null)
@@ -455,7 +392,7 @@ public class PlanningController : ControllerBase
         string? projectName = null;
         if (request.ProjectId.HasValue)
         {
-            var project = await _dbContext.Projects.FindAsync(new object[] { request.ProjectId.Value }, ct);
+            var project = await _projectRepository.GetByIdAsync(request.ProjectId.Value, trackChanges: false, ct);
             if (project == null)
             {
                 return NotFound(new { message = $"Project '{request.ProjectId.Value}' not found." });
@@ -470,8 +407,7 @@ public class PlanningController : ControllerBase
                     .ToList())
             : "[0, 6]";
 
-        var config = await _dbContext.PlanningCutoffConfigs
-            .FirstOrDefaultAsync(c => c.ProjectId == request.ProjectId, ct);
+        var config = await _planningRepository.GetCutoffConfigAsync(request.ProjectId, trackChanges: true, ct);
 
         if (config == null)
         {
@@ -484,7 +420,7 @@ public class PlanningController : ControllerBase
                 ExcludedDaysOfWeekJson = canonicalExcludedDaysJson,
                 UpdatedAt = DateTimeOffset.UtcNow
             };
-            _dbContext.PlanningCutoffConfigs.Add(config);
+            _planningRepository.AddCutoffConfig(config);
         }
         else
         {
@@ -495,7 +431,7 @@ public class PlanningController : ControllerBase
             config.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
-        await _dbContext.SaveChangesAsync(ct);
+        await _planningRepository.SaveChangesAsync(ct);
 
         return Ok(new PlanningCutoffConfigDto(
             config.Id,

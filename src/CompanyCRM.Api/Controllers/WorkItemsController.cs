@@ -4,11 +4,9 @@ using CompanyCRM.Application.DTOs;
 using CompanyCRM.Application.Interfaces;
 using CompanyCRM.Domain.Entities;
 using CompanyCRM.Domain.Enums;
-using CompanyCRM.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
 
 namespace CompanyCRM.Api.Controllers;
 
@@ -17,16 +15,22 @@ namespace CompanyCRM.Api.Controllers;
 [Authorize]
 public class WorkItemsController : ControllerBase
 {
-    private readonly CrmDbContext _dbContext;
+    private readonly IWorkItemRepository _workItemRepository;
+    private readonly IProjectRepository _projectRepository;
+    private readonly IEmployeeRepository _employeeRepository;
     private readonly IEmailNotificationService _emailNotificationService;
     private readonly IHubContext<CrmHub, ICrmHubClient> _hubContext;
 
     public WorkItemsController(
-        CrmDbContext dbContext,
+        IWorkItemRepository workItemRepository,
+        IProjectRepository projectRepository,
+        IEmployeeRepository employeeRepository,
         IEmailNotificationService emailNotificationService,
         IHubContext<CrmHub, ICrmHubClient> hubContext)
     {
-        _dbContext = dbContext;
+        _workItemRepository = workItemRepository;
+        _projectRepository = projectRepository;
+        _employeeRepository = employeeRepository;
         _emailNotificationService = emailNotificationService;
         _hubContext = hubContext;
     }
@@ -57,30 +61,16 @@ public class WorkItemsController : ControllerBase
         if (pageSize < 1) pageSize = 20;
         if (pageSize > 100) pageSize = 100;
 
-        var query = _dbContext.WorkItems
-            .AsNoTracking()
-            .Include(w => w.Project)
-            .Include(w => w.CreatedBy)
-            .Include(w => w.Assignee)
-            .Include(w => w.Reviewer)
-            .Include(w => w.TimeEntries)
-            .AsQueryable();
-
-        if (projectId.HasValue) query = query.Where(w => w.ProjectId == projectId.Value);
-        if (status.HasValue) query = query.Where(w => w.Status == status.Value);
-        if (type.HasValue) query = query.Where(w => w.Type == type.Value);
-        if (priority.HasValue) query = query.Where(w => w.Priority == priority.Value);
-        if (assigneeId.HasValue) query = query.Where(w => w.AssigneeId == assigneeId.Value);
-        if (reviewerId.HasValue) query = query.Where(w => w.ReviewerId == reviewerId.Value);
-        if (!string.IsNullOrWhiteSpace(sprint)) query = query.Where(w => w.SprintName == sprint.Trim());
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToLower();
-            query = query.Where(w => w.Title.ToLower().Contains(term) || w.Code.ToLower().Contains(term));
-        }
-
-        var matchingItems = await query.ToListAsync(ct);
+        var matchingItems = await _workItemRepository.GetFilteredWithDetailsAsync(
+            projectId,
+            status,
+            type,
+            priority,
+            assigneeId,
+            reviewerId,
+            sprint,
+            search,
+            ct);
 
         var totalCount = matchingItems.Count;
         var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
@@ -100,14 +90,7 @@ public class WorkItemsController : ControllerBase
     public async Task<ActionResult<WorkItemDto>> GetWorkItem([FromRoute] Guid id, CancellationToken ct)
     {
         var callerId = GetCallerId();
-        var item = await _dbContext.WorkItems
-            .AsNoTracking()
-            .Include(w => w.Project)
-            .Include(w => w.CreatedBy)
-            .Include(w => w.Assignee)
-            .Include(w => w.Reviewer)
-            .Include(w => w.TimeEntries)
-            .FirstOrDefaultAsync(w => w.Id == id, ct);
+        var item = await _workItemRepository.GetByIdWithDetailsAsync(id, trackChanges: false, ct);
 
         if (item == null)
         {
@@ -122,7 +105,7 @@ public class WorkItemsController : ControllerBase
     {
         var callerId = GetCallerId();
 
-        var project = await _dbContext.Projects.FindAsync(new object[] { request.ProjectId }, ct);
+        var project = await _projectRepository.GetByIdAsync(request.ProjectId, trackChanges: false, ct);
         if (project == null)
         {
             return BadRequest(new { message = $"Project '{request.ProjectId}' does not exist." });
@@ -134,10 +117,7 @@ public class WorkItemsController : ControllerBase
         }
 
         // Generate sequential code e.g. CRM-101
-        var existingCodes = await _dbContext.WorkItems
-            .Where(w => w.ProjectId == request.ProjectId && w.Code.StartsWith(project.Code + "-"))
-            .Select(w => w.Code)
-            .ToListAsync(ct);
+        var existingCodes = await _workItemRepository.GetCodesByProjectPrefixAsync(request.ProjectId, project.Code + "-", ct);
 
         var maxNumber = 100;
         foreach (var code in existingCodes)
@@ -172,9 +152,9 @@ public class WorkItemsController : ControllerBase
             BoardPosition = 0
         };
 
-        _dbContext.WorkItems.Add(workItem);
+        _workItemRepository.Add(workItem);
 
-        _dbContext.WorkItemHistories.Add(new WorkItemHistory
+        _workItemRepository.AddHistory(new WorkItemHistory
         {
             WorkItemId = workItem.Id,
             ChangedById = callerId,
@@ -186,10 +166,10 @@ public class WorkItemsController : ControllerBase
         Employee? reviewer = null;
         if (request.ReviewerId.HasValue)
         {
-            reviewer = await _dbContext.Employees.FindAsync(new object[] { request.ReviewerId.Value }, ct);
+            reviewer = await _employeeRepository.GetByIdAsync(request.ReviewerId.Value, ct);
             if (reviewer != null)
             {
-                _dbContext.WorkItemHistories.Add(new WorkItemHistory
+                _workItemRepository.AddHistory(new WorkItemHistory
                 {
                     WorkItemId = workItem.Id,
                     ChangedById = callerId,
@@ -202,7 +182,7 @@ public class WorkItemsController : ControllerBase
             }
         }
 
-        await _dbContext.SaveChangesAsync(ct);
+        await _workItemRepository.SaveChangesAsync(ct);
 
         if (reviewer != null)
         {
@@ -227,7 +207,7 @@ public class WorkItemsController : ControllerBase
             ));
         }
 
-        var creator = await _dbContext.Employees.FindAsync(new object[] { callerId }, ct);
+        var creator = await _employeeRepository.GetByIdAsync(callerId, ct);
         workItem.CreatedBy = creator!;
         workItem.Project = project;
         workItem.Reviewer = reviewer;
@@ -246,13 +226,7 @@ public class WorkItemsController : ControllerBase
         CancellationToken ct)
     {
         var callerId = GetCallerId();
-        var item = await _dbContext.WorkItems
-            .Include(w => w.Project)
-            .Include(w => w.CreatedBy)
-            .Include(w => w.Assignee)
-            .Include(w => w.Reviewer)
-            .Include(w => w.TimeEntries)
-            .FirstOrDefaultAsync(w => w.Id == id, ct);
+        var item = await _workItemRepository.GetByIdWithDetailsAsync(id, trackChanges: true, ct);
 
         if (item == null)
         {
@@ -270,7 +244,7 @@ public class WorkItemsController : ControllerBase
         if (request.AssigneeId.HasValue) item.AssigneeId = request.AssigneeId.Value;
 
         item.UpdatedAt = DateTimeOffset.UtcNow;
-        _dbContext.WorkItemHistories.Add(new WorkItemHistory
+        _workItemRepository.AddHistory(new WorkItemHistory
         {
             WorkItemId = item.Id,
             ChangedById = callerId,
@@ -279,7 +253,7 @@ public class WorkItemsController : ControllerBase
             ChangedAt = DateTimeOffset.UtcNow
         });
 
-        await _dbContext.SaveChangesAsync(ct);
+        await _workItemRepository.SaveChangesAsync(ct);
 
         var dto = MapToDto(item, callerId);
         await _hubContext.Clients.Groups(CrmHub.ProjectAndUnscopedGroups(item.ProjectId))
@@ -296,13 +270,7 @@ public class WorkItemsController : ControllerBase
         CancellationToken ct)
     {
         var callerId = GetCallerId();
-        var item = await _dbContext.WorkItems
-            .Include(w => w.Project)
-            .Include(w => w.CreatedBy)
-            .Include(w => w.Assignee)
-            .Include(w => w.Reviewer)
-            .Include(w => w.TimeEntries)
-            .FirstOrDefaultAsync(w => w.Id == id, ct);
+        var item = await _workItemRepository.GetByIdWithDetailsAsync(id, trackChanges: true, ct);
 
         if (item == null)
         {
@@ -325,7 +293,7 @@ public class WorkItemsController : ControllerBase
         }
         item.UpdatedAt = DateTimeOffset.UtcNow;
 
-        _dbContext.WorkItemHistories.Add(new WorkItemHistory
+        _workItemRepository.AddHistory(new WorkItemHistory
         {
             WorkItemId = item.Id,
             ChangedById = callerId,
@@ -337,7 +305,7 @@ public class WorkItemsController : ControllerBase
             ChangedAt = DateTimeOffset.UtcNow
         });
 
-        await _dbContext.SaveChangesAsync(ct);
+        await _workItemRepository.SaveChangesAsync(ct);
 
         var dto = MapToDto(item, callerId);
         await _hubContext.Clients.Groups(CrmHub.ProjectAndUnscopedGroups(item.ProjectId))
@@ -354,9 +322,7 @@ public class WorkItemsController : ControllerBase
     {
         var callerId = GetCallerId();
 
-        var item = await _dbContext.WorkItems
-            .Include(w => w.Project)
-            .FirstOrDefaultAsync(w => w.Id == id, ct);
+        var item = await _workItemRepository.GetByIdWithProjectAsync(id, trackChanges: true, ct);
 
         if (item == null)
         {
@@ -369,14 +335,12 @@ public class WorkItemsController : ControllerBase
         }
 
         // Auto-finalize any active running timer for current employee
-        var activeTimer = await _dbContext.TimeEntries
-            .Include(t => t.WorkItem)
-            .FirstOrDefaultAsync(t => t.EmployeeId == callerId && t.IsRunning, ct);
+        var activeTimer = await _workItemRepository.GetActiveTimerForEmployeeAsync(callerId, trackChanges: true, ct);
 
         if (activeTimer != null)
         {
             activeTimer.StopTimer(DateTimeOffset.UtcNow, $"Auto-finalized upon starting timer on {item.Code}.");
-            _dbContext.WorkItemHistories.Add(new WorkItemHistory
+            _workItemRepository.AddHistory(new WorkItemHistory
             {
                 WorkItemId = activeTimer.WorkItemId,
                 ChangedById = callerId,
@@ -396,9 +360,9 @@ public class WorkItemsController : ControllerBase
             LoggedDate = DateOnly.FromDateTime(DateTime.UtcNow)
         };
 
-        _dbContext.TimeEntries.Add(entry);
+        _workItemRepository.AddTimeEntry(entry);
 
-        _dbContext.WorkItemHistories.Add(new WorkItemHistory
+        _workItemRepository.AddHistory(new WorkItemHistory
         {
             WorkItemId = id,
             ChangedById = callerId,
@@ -407,9 +371,9 @@ public class WorkItemsController : ControllerBase
             ChangedAt = DateTimeOffset.UtcNow
         });
 
-        await _dbContext.SaveChangesAsync(ct);
+        await _workItemRepository.SaveChangesAsync(ct);
 
-        var caller = await _dbContext.Employees.FindAsync(new object[] { callerId }, ct);
+        var caller = await _employeeRepository.GetByIdAsync(callerId, ct);
         var entryDto = new TimeEntryDto(
             entry.Id,
             entry.WorkItemId,
@@ -427,13 +391,7 @@ public class WorkItemsController : ControllerBase
         );
 
         // Broadcast update for work item
-        var itemWithEntries = await _dbContext.WorkItems
-            .Include(w => w.Project)
-            .Include(w => w.CreatedBy)
-            .Include(w => w.Assignee)
-            .Include(w => w.Reviewer)
-            .Include(w => w.TimeEntries)
-            .FirstOrDefaultAsync(w => w.Id == id, ct);
+        var itemWithEntries = await _workItemRepository.GetByIdWithDetailsAsync(id, trackChanges: false, ct);
 
         if (itemWithEntries != null)
         {
@@ -452,9 +410,7 @@ public class WorkItemsController : ControllerBase
     {
         var callerId = GetCallerId();
 
-        var entry = await _dbContext.TimeEntries
-            .Include(t => t.WorkItem)
-            .FirstOrDefaultAsync(t => t.WorkItemId == id && t.EmployeeId == callerId && t.IsRunning, ct);
+        var entry = await _workItemRepository.GetRunningTimerAsync(id, callerId, trackChanges: true, ct);
 
         if (entry == null)
         {
@@ -467,7 +423,7 @@ public class WorkItemsController : ControllerBase
             entry.IsBillable = request.IsBillable.Value;
         }
 
-        _dbContext.WorkItemHistories.Add(new WorkItemHistory
+        _workItemRepository.AddHistory(new WorkItemHistory
         {
             WorkItemId = id,
             ChangedById = callerId,
@@ -476,9 +432,9 @@ public class WorkItemsController : ControllerBase
             ChangedAt = DateTimeOffset.UtcNow
         });
 
-        await _dbContext.SaveChangesAsync(ct);
+        await _workItemRepository.SaveChangesAsync(ct);
 
-        var caller = await _dbContext.Employees.FindAsync(new object[] { callerId }, ct);
+        var caller = await _employeeRepository.GetByIdAsync(callerId, ct);
         var entryDto = new TimeEntryDto(
             entry.Id,
             entry.WorkItemId,
@@ -495,13 +451,7 @@ public class WorkItemsController : ControllerBase
             entry.Notes
         );
 
-        var itemWithEntries = await _dbContext.WorkItems
-            .Include(w => w.Project)
-            .Include(w => w.CreatedBy)
-            .Include(w => w.Assignee)
-            .Include(w => w.Reviewer)
-            .Include(w => w.TimeEntries)
-            .FirstOrDefaultAsync(w => w.Id == id, ct);
+        var itemWithEntries = await _workItemRepository.GetByIdWithDetailsAsync(id, trackChanges: false, ct);
 
         if (itemWithEntries != null)
         {
@@ -517,11 +467,7 @@ public class WorkItemsController : ControllerBase
     {
         var callerId = GetCallerId();
 
-        var entry = await _dbContext.TimeEntries
-            .AsNoTracking()
-            .Include(t => t.WorkItem)
-            .Include(t => t.Employee)
-            .FirstOrDefaultAsync(t => t.EmployeeId == callerId && t.IsRunning, ct);
+        var entry = await _workItemRepository.GetActiveTimerForEmployeeAsync(callerId, trackChanges: false, ct);
 
         if (entry == null)
         {
@@ -558,9 +504,7 @@ public class WorkItemsController : ControllerBase
             return BadRequest(new { message = "DurationMinutes must be between 1 and 1440 (24 hours)." });
         }
 
-        var item = await _dbContext.WorkItems
-            .Include(w => w.Project)
-            .FirstOrDefaultAsync(w => w.Id == id, ct);
+        var item = await _workItemRepository.GetByIdWithProjectAsync(id, trackChanges: false, ct);
 
         if (item == null)
         {
@@ -581,9 +525,9 @@ public class WorkItemsController : ControllerBase
             EndedAt = DateTimeOffset.UtcNow
         };
 
-        _dbContext.TimeEntries.Add(entry);
+        _workItemRepository.AddTimeEntry(entry);
 
-        _dbContext.WorkItemHistories.Add(new WorkItemHistory
+        _workItemRepository.AddHistory(new WorkItemHistory
         {
             WorkItemId = id,
             ChangedById = callerId,
@@ -592,9 +536,9 @@ public class WorkItemsController : ControllerBase
             ChangedAt = DateTimeOffset.UtcNow
         });
 
-        await _dbContext.SaveChangesAsync(ct);
+        await _workItemRepository.SaveChangesAsync(ct);
 
-        var caller = await _dbContext.Employees.FindAsync(new object[] { callerId }, ct);
+        var caller = await _employeeRepository.GetByIdAsync(callerId, ct);
         var entryDto = new TimeEntryDto(
             entry.Id,
             entry.WorkItemId,
@@ -611,13 +555,7 @@ public class WorkItemsController : ControllerBase
             entry.Notes
         );
 
-        var itemWithEntries = await _dbContext.WorkItems
-            .Include(w => w.Project)
-            .Include(w => w.CreatedBy)
-            .Include(w => w.Assignee)
-            .Include(w => w.Reviewer)
-            .Include(w => w.TimeEntries)
-            .FirstOrDefaultAsync(w => w.Id == id, ct);
+        var itemWithEntries = await _workItemRepository.GetByIdWithDetailsAsync(id, trackChanges: false, ct);
 
         if (itemWithEntries != null)
         {
@@ -631,17 +569,13 @@ public class WorkItemsController : ControllerBase
     [HttpGet("{id:guid}/history")]
     public async Task<ActionResult<List<WorkItemHistoryDto>>> GetWorkItemHistory([FromRoute] Guid id, CancellationToken ct)
     {
-        var exists = await _dbContext.WorkItems.AnyAsync(w => w.Id == id, ct);
+        var exists = await _workItemRepository.ExistsAsync(id, ct);
         if (!exists)
         {
             return NotFound(new { message = $"Work item with ID '{id}' not found." });
         }
 
-        var histories = await _dbContext.WorkItemHistories
-            .AsNoTracking()
-            .Include(h => h.ChangedBy)
-            .Where(h => h.WorkItemId == id)
-            .ToListAsync(ct);
+        var histories = await _workItemRepository.GetHistoriesByWorkItemIdAsync(id, ct);
 
         var result = histories
             .OrderByDescending(h => h.ChangedAt)

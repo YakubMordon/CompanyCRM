@@ -1,12 +1,11 @@
 using System.Security.Claims;
 using System.Text.Json;
 using CompanyCRM.Application.DTOs;
+using CompanyCRM.Application.Interfaces;
 using CompanyCRM.Domain.Entities;
 using CompanyCRM.Domain.Enums;
-using CompanyCRM.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace CompanyCRM.Api.Controllers;
 
@@ -15,11 +14,11 @@ namespace CompanyCRM.Api.Controllers;
 [Authorize]
 public class EmployeesController : ControllerBase
 {
-    private readonly CrmDbContext _dbContext;
+    private readonly IEmployeeRepository _employeeRepository;
 
-    public EmployeesController(CrmDbContext dbContext)
+    public EmployeesController(IEmployeeRepository employeeRepository)
     {
-        _dbContext = dbContext;
+        _employeeRepository = employeeRepository;
     }
 
     private Guid GetCallerId()
@@ -36,28 +35,7 @@ public class EmployeesController : ControllerBase
         [FromQuery] Guid? projectId = null,
         CancellationToken ct = default)
     {
-        var query = _dbContext.Employees
-            .AsNoTracking()
-            .Include(e => e.Skills)
-            .AsQueryable();
-
-        if (projectId.HasValue)
-        {
-            query = query.Where(e => e.ProjectMemberships.Any(pm => pm.ProjectId == projectId.Value));
-        }
-
-        if (!string.IsNullOrWhiteSpace(department))
-        {
-            query = query.Where(e => e.Department == department.Trim());
-        }
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToLower();
-            query = query.Where(e => e.FullName.ToLower().Contains(term) || e.Email.ToLower().Contains(term) || e.JobTitle.ToLower().Contains(term));
-        }
-
-        var employees = await query.OrderBy(e => e.FullName).ToListAsync(ct);
+        var employees = await _employeeRepository.GetDirectoryAsync(search, department, projectId, ct);
 
         // Safe DTO strictly omitting AnnualBaseSalary, HourlyCostRate, HourlyBillableRate, TargetUtilizationPercent
         var result = employees.Select(e => new EmployeeDirectoryDto(
@@ -87,10 +65,7 @@ public class EmployeesController : ControllerBase
     [HttpGet("{id:guid}/profile")]
     public async Task<ActionResult<EmployeeProfileDto>> GetProfile([FromRoute] Guid id, CancellationToken ct)
     {
-        var e = await _dbContext.Employees
-            .AsNoTracking()
-            .Include(e => e.Skills)
-            .FirstOrDefaultAsync(e => e.Id == id, ct);
+        var e = await _employeeRepository.GetByIdWithSkillsAsync(id, trackChanges: false, ct);
 
         if (e == null)
         {
@@ -135,9 +110,7 @@ public class EmployeesController : ControllerBase
             return Forbid();
         }
 
-        var employee = await _dbContext.Employees
-            .Include(e => e.Skills)
-            .FirstOrDefaultAsync(e => e.Id == id, ct);
+        var employee = await _employeeRepository.GetByIdWithSkillsAsync(id, trackChanges: true, ct);
 
         if (employee == null)
         {
@@ -168,7 +141,7 @@ public class EmployeesController : ControllerBase
         }
 
         employee.UpdatedAt = DateTimeOffset.UtcNow;
-        await _dbContext.SaveChangesAsync(ct);
+        await _employeeRepository.SaveChangesAsync(ct);
 
         var dto = new EmployeeProfileDto(
             employee.Id,
@@ -197,18 +170,13 @@ public class EmployeesController : ControllerBase
     [HttpGet("{id:guid}/skills")]
     public async Task<ActionResult<List<EmployeeSkillDto>>> GetSkills([FromRoute] Guid id, CancellationToken ct)
     {
-        var employeeExists = await _dbContext.Employees.AnyAsync(e => e.Id == id, ct);
+        var employeeExists = await _employeeRepository.ExistsAsync(id, ct);
         if (!employeeExists)
         {
             return NotFound(new { message = $"Employee with ID '{id}' not found." });
         }
 
-        var skills = await _dbContext.EmployeeSkills
-            .AsNoTracking()
-            .Where(s => s.EmployeeId == id)
-            .OrderBy(s => s.Category)
-            .ThenBy(s => s.SkillName)
-            .ToListAsync(ct);
+        var skills = await _employeeRepository.GetSkillsAsync(id, ct);
 
         var result = skills.Select(s => new EmployeeSkillDto(
             s.Id,
@@ -247,15 +215,14 @@ public class EmployeesController : ControllerBase
             return BadRequest(new { message = "Proficiency level must be an integer between 1 and 5." });
         }
 
-        var employee = await _dbContext.Employees.FindAsync(new object[] { id }, ct);
-        if (employee == null)
+        var employeeExists = await _employeeRepository.ExistsAsync(id, ct);
+        if (!employeeExists)
         {
             return NotFound(new { message = $"Employee with ID '{id}' not found." });
         }
 
         var normalizedName = request.SkillName.Trim();
-        var skill = await _dbContext.EmployeeSkills
-            .FirstOrDefaultAsync(s => s.EmployeeId == id && s.SkillName.ToLower() == normalizedName.ToLower(), ct);
+        var skill = await _employeeRepository.GetSkillByNameAsync(id, normalizedName, ct);
 
         if (skill == null)
         {
@@ -268,7 +235,7 @@ public class EmployeesController : ControllerBase
                 YearsOfExperience = Math.Max(0.0m, request.YearsOfExperience),
                 LastEvaluatedAt = DateTimeOffset.UtcNow
             };
-            _dbContext.EmployeeSkills.Add(skill);
+            _employeeRepository.AddSkill(skill);
         }
         else
         {
@@ -278,7 +245,7 @@ public class EmployeesController : ControllerBase
             skill.LastEvaluatedAt = DateTimeOffset.UtcNow;
         }
 
-        await _dbContext.SaveChangesAsync(ct);
+        await _employeeRepository.SaveChangesAsync(ct);
 
         return Ok(new EmployeeSkillDto(
             skill.Id,
@@ -305,16 +272,15 @@ public class EmployeesController : ControllerBase
         }
 
         var normalizedName = skillName.Trim().ToLower();
-        var skill = await _dbContext.EmployeeSkills
-            .FirstOrDefaultAsync(s => s.EmployeeId == id && s.SkillName.ToLower() == normalizedName, ct);
+        var skill = await _employeeRepository.GetSkillByNameAsync(id, normalizedName, ct);
 
         if (skill == null)
         {
             return NotFound(new { message = $"Skill '{skillName}' not found for employee." });
         }
 
-        _dbContext.EmployeeSkills.Remove(skill);
-        await _dbContext.SaveChangesAsync(ct);
+        _employeeRepository.RemoveSkill(skill);
+        await _employeeRepository.SaveChangesAsync(ct);
 
         return NoContent();
     }

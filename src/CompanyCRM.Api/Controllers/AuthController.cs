@@ -1,12 +1,11 @@
 using System.Security.Claims;
 using CompanyCRM.Api.Services;
 using CompanyCRM.Application.DTOs;
+using CompanyCRM.Application.Interfaces;
 using CompanyCRM.Domain.Entities;
 using CompanyCRM.Domain.Enums;
-using CompanyCRM.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace CompanyCRM.Api.Controllers;
 
@@ -14,12 +13,12 @@ namespace CompanyCRM.Api.Controllers;
 [Route("api/auth")]
 public class AuthController : ControllerBase
 {
-    private readonly CrmDbContext _dbContext;
+    private readonly IEmployeeRepository _employeeRepository;
     private readonly ITokenService _tokenService;
 
-    public AuthController(CrmDbContext dbContext, ITokenService tokenService)
+    public AuthController(IEmployeeRepository employeeRepository, ITokenService tokenService)
     {
-        _dbContext = dbContext;
+        _employeeRepository = employeeRepository;
         _tokenService = tokenService;
     }
 
@@ -33,9 +32,7 @@ public class AuthController : ControllerBase
         }
 
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
-        var employee = await _dbContext.Employees
-            .Include(e => e.Skills)
-            .FirstOrDefaultAsync(e => e.Email.ToLower() == normalizedEmail, ct);
+        var employee = await _employeeRepository.GetByEmailWithSkillsAsync(normalizedEmail, ct);
 
         if (employee == null)
         {
@@ -59,9 +56,7 @@ public class AuthController : ControllerBase
             return Unauthorized(new { message = "Caller identity is not authenticated." });
         }
 
-        var employee = await _dbContext.Employees
-            .Include(e => e.Skills)
-            .FirstOrDefaultAsync(e => e.Id == callerId, ct);
+        var employee = await _employeeRepository.GetByIdWithSkillsAsync(callerId, trackChanges: false, ct);
 
         if (employee == null)
         {
@@ -93,10 +88,7 @@ public class AuthController : ControllerBase
         }
 
         // Search for seeded employee by target role
-        var employee = await _dbContext.Employees
-            .Include(e => e.Skills)
-            .OrderBy(e => e.FullName)
-            .FirstOrDefaultAsync(e => e.Role == targetRole, ct);
+        var employee = await _employeeRepository.GetFirstByRoleWithSkillsAsync(targetRole, ct);
 
         if (employee == null)
         {
@@ -209,7 +201,8 @@ public class AuthController : ControllerBase
                 "management:view-compensation",
                 "management:view-profitability",
                 "management:view-analytics",
-                "projects:manage"
+                "projects:manage",
+                "employees:manage"
             });
         }
 

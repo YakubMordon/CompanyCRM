@@ -3,11 +3,9 @@ using CompanyCRM.Api.Hubs;
 using CompanyCRM.Application.DTOs;
 using CompanyCRM.Application.Interfaces;
 using CompanyCRM.Domain.Enums;
-using CompanyCRM.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
 
 namespace CompanyCRM.Api.Controllers;
 
@@ -16,16 +14,16 @@ namespace CompanyCRM.Api.Controllers;
 [Authorize]
 public class ReviewsController : ControllerBase
 {
-    private readonly CrmDbContext _dbContext;
+    private readonly IWorkItemRepository _workItemRepository;
     private readonly IWorkItemReviewService _reviewService;
     private readonly IHubContext<CrmHub, ICrmHubClient> _hubContext;
 
     public ReviewsController(
-        CrmDbContext dbContext,
+        IWorkItemRepository workItemRepository,
         IWorkItemReviewService reviewService,
         IHubContext<CrmHub, ICrmHubClient> hubContext)
     {
-        _dbContext = dbContext;
+        _workItemRepository = workItemRepository;
         _reviewService = reviewService;
         _hubContext = hubContext;
     }
@@ -44,25 +42,9 @@ public class ReviewsController : ControllerBase
         CancellationToken ct = default)
     {
         var callerId = GetCallerId();
+        var reviewerId = assignedToMeOnly ? (Guid?)callerId : null;
 
-        var query = _dbContext.WorkItems
-            .AsNoTracking()
-            .Include(w => w.Project)
-            .Include(w => w.CreatedBy)
-            .Include(w => w.Reviewer)
-            .Where(w => w.ReviewStatus == ReviewStatus.Pending || w.ReviewStatus == ReviewStatus.ClarificationNeeded);
-
-        if (assignedToMeOnly)
-        {
-            query = query.Where(w => w.ReviewerId == callerId);
-        }
-
-        if (projectId.HasValue)
-        {
-            query = query.Where(w => w.ProjectId == projectId.Value);
-        }
-
-        var items = await query.ToListAsync(ct);
+        var items = await _workItemRepository.GetReviewQueueItemsAsync(projectId, reviewerId, ct);
 
         var result = items.OrderByDescending(w => w.CreatedAt).Select(w => new WorkItemReviewQueueDto(
             w.Id,

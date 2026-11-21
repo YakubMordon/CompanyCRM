@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import Paper from '@mui/material/Paper';
 import Box from '@mui/material/Box';
@@ -7,18 +7,43 @@ import Grid from '@mui/material/Grid';
 import LinearProgress from '@mui/material/LinearProgress';
 import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogActions from '@mui/material/DialogActions';
+import Alert from '@mui/material/Alert';
+import CircularProgress from '@mui/material/CircularProgress';
 import { alpha } from '@mui/material/styles';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { EmployeeCompensationDto } from '../../types';
 import { managementApi } from '../../services/managementApi';
+import { useAuth } from '../../contexts/AuthContext';
+import { EmployeeManagementDialog } from './EmployeeManagementDialog';
 
 export const CompensationDataGrid: React.FC = () => {
+  const { currentUser } = useAuth();
   const [data, setData] = useState<EmployeeCompensationDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+  // Management Dialog state
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeCompensationDto | null>(null);
+
+  // Delete confirmation dialog state
+  const [deleteTarget, setDeleteTarget] = useState<EmployeeCompensationDto | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const loadData = useCallback(() => {
     setIsLoading(true);
     managementApi
       .getCompensation()
@@ -26,6 +51,40 @@ export const CompensationDataGrid: React.FC = () => {
       .catch(console.error)
       .finally(() => setIsLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleOpenAdd = () => {
+    setSelectedEmployee(null);
+    setDialogOpen(true);
+  };
+
+  const handleOpenEdit = (emp: EmployeeCompensationDto) => {
+    setSelectedEmployee(emp);
+    setDialogOpen(true);
+  };
+
+  const handleOpenDelete = (emp: EmployeeCompensationDto) => {
+    setDeleteError(null);
+    setDeleteTarget(emp);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await managementApi.deleteEmployee(deleteTarget.employeeId);
+      setDeleteTarget(null);
+      loadData();
+    } catch (err: any) {
+      setDeleteError(err.response?.data?.message || err.message || 'Failed to delete employee');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -59,94 +118,49 @@ export const CompensationDataGrid: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             gap: 1.5,
-            width: '100%',
-            height: '100%',
+            overflow: 'hidden',
           }}
         >
           <Avatar
-            sx={{
-              width: 30,
-              height: 30,
-              bgcolor: 'primary.dark',
-              fontWeight: 600,
-              flexShrink: 0,
-            }}
+            src={params.row.department} // Avatar image placeholder
+            alt={params.value}
+            sx={{ width: 32, height: 32, fontSize: '0.85rem' }}
           >
-            {params.row.fullName.charAt(0)}
+            {params.value?.[0]}
           </Avatar>
-
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              gap: '1px',
-              minWidth: 0,
-              flexGrow: 1,
-              overflow: 'hidden',
-            }}
-          >
-            <Typography
-              variant="body2"
-              noWrap
-              sx={{ fontWeight: 600, lineHeight: 1.1 }}
-            >
-              {params.row.fullName}
+          <Box sx={{ overflow: 'hidden' }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+              {params.value}
             </Typography>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              noWrap
-              sx={{ lineHeight: 1.1 }}
-            >
-              {params.row.department}
+            <Typography variant="caption" color="text.secondary" noWrap display="block">
+              {params.row.jobTitle}
             </Typography>
           </Box>
         </Box>
       ),
     },
     {
-      field: 'jobTitle',
-      headerName: 'Title',
-      width: 170,
-      renderCell: (params: GridRenderCellParams<EmployeeCompensationDto>) => (
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            width: '100%',
-            height: '100%',
-            overflow: 'hidden',
-          }}
-        >
-          <Typography
-            variant="body2"
-            noWrap
-            title={params.value}
-            sx={{
-              fontWeight: 500,
-              lineHeight: 1.1,
-            }}
-          >
-            {params.value}
-          </Typography>
-        </Box>
-      ),
+      field: 'department',
+      headerName: 'Department',
+      width: 140,
     },
     {
-      field: 'role',
-      headerName: 'Role',
-      width: 120,
+      field: 'seniorityRank',
+      headerName: 'Seniority',
+      width: 110,
       renderCell: (params: GridRenderCellParams<EmployeeCompensationDto>) => (
         <Chip
           label={params.value}
           size="small"
+          variant="outlined"
           color={
-            params.value === 'HigherManagement'
-              ? 'success'
-              : params.value === 'TeamLead'
-              ? 'warning'
-              : 'primary'
+            params.value === 'Principal'
+              ? 'secondary'
+              : params.value === 'Lead'
+              ? 'primary'
+              : params.value === 'Senior'
+              ? 'info'
+              : 'default'
           }
           sx={{ fontWeight: 600, fontSize: '0.68rem' }}
         />
@@ -246,6 +260,45 @@ export const CompensationDataGrid: React.FC = () => {
         );
       },
     },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 110,
+      sortable: false,
+      filterable: false,
+      renderCell: (params: GridRenderCellParams<EmployeeCompensationDto>) => {
+        const isSelf = currentUser?.id === params.row.employeeId;
+        return (
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <Tooltip title="Edit Employee">
+              <IconButton
+                size="small"
+                color="primary"
+                onClick={() => handleOpenEdit(params.row)}
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip
+              title={
+                isSelf ? 'Cannot delete your own active account' : 'Delete Employee'
+              }
+            >
+              <span>
+                <IconButton
+                  size="small"
+                  color="error"
+                  disabled={isSelf}
+                  onClick={() => handleOpenDelete(params.row)}
+                >
+                  <DeleteOutlineIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Box>
+        );
+      },
+    },
   ];
 
   return (
@@ -309,9 +362,26 @@ export const CompensationDataGrid: React.FC = () => {
 
       {/* Compensation DataGrid */}
       <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-          Executive Compensation & Performance Metrics
-        </Typography>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mb: 2,
+          }}
+        >
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            Executive Compensation & Performance Metrics
+          </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<PersonAddIcon />}
+            onClick={handleOpenAdd}
+          >
+            Add Employee
+          </Button>
+        </Box>
 
         <Box sx={{ height: 420, width: '100%' }}>
           <DataGrid
@@ -335,6 +405,48 @@ export const CompensationDataGrid: React.FC = () => {
           />
         </Box>
       </Paper>
+
+      {/* Employee Add/Edit Dialog */}
+      <EmployeeManagementDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onSuccess={loadData}
+        employeeToEdit={selectedEmployee}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onClose={isDeleting ? undefined : () => setDeleteTarget(null)}
+      >
+        <DialogTitle>Confirm Delete Employee</DialogTitle>
+        <DialogContent>
+          {deleteError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {deleteError}
+            </Alert>
+          )}
+          <DialogContentText>
+            Are you sure you want to delete <strong>{deleteTarget?.fullName}</strong> (
+            {deleteTarget?.email})? This action cannot be undone. Any work items created by this
+            employee will be reassigned to you.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDeleteTarget(null)} disabled={isDeleting}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleConfirmDelete}
+            disabled={isDeleting}
+            startIcon={isDeleting ? <CircularProgress size={18} /> : undefined}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

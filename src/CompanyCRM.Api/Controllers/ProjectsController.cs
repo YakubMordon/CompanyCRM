@@ -1,10 +1,9 @@
 using CompanyCRM.Application.DTOs;
+using CompanyCRM.Application.Interfaces;
 using CompanyCRM.Domain.Entities;
 using CompanyCRM.Domain.Enums;
-using CompanyCRM.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace CompanyCRM.Api.Controllers;
 
@@ -13,28 +12,21 @@ namespace CompanyCRM.Api.Controllers;
 [Authorize]
 public class ProjectsController : ControllerBase
 {
-    private readonly CrmDbContext _dbContext;
+    private readonly IProjectRepository _projectRepository;
+    private readonly IEmployeeRepository _employeeRepository;
 
-    public ProjectsController(CrmDbContext dbContext)
+    public ProjectsController(
+        IProjectRepository projectRepository,
+        IEmployeeRepository employeeRepository)
     {
-        _dbContext = dbContext;
+        _projectRepository = projectRepository;
+        _employeeRepository = employeeRepository;
     }
 
     [HttpGet]
     public async Task<ActionResult<List<ProjectDto>>> GetProjects([FromQuery] bool includeInactive = false, CancellationToken ct = default)
     {
-        var query = _dbContext.Projects
-            .AsNoTracking()
-            .Include(p => p.Members)
-            .Include(p => p.WorkItems)
-            .AsQueryable();
-
-        if (!includeInactive)
-        {
-            query = query.Where(p => p.IsActive);
-        }
-
-        var projects = await query.OrderBy(p => p.Name).ToListAsync(ct);
+        var projects = await _projectRepository.GetProjectsWithDetailsAsync(includeInactive, ct);
 
         var result = projects.Select(p => new ProjectDto(
             p.Id,
@@ -60,11 +52,7 @@ public class ProjectsController : ControllerBase
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ProjectDto>> GetProject([FromRoute] Guid id, CancellationToken ct)
     {
-        var p = await _dbContext.Projects
-            .AsNoTracking()
-            .Include(p => p.Members)
-            .Include(p => p.WorkItems)
-            .FirstOrDefaultAsync(p => p.Id == id, ct);
+        var p = await _projectRepository.GetByIdWithDetailsAsync(id, trackChanges: false, ct);
 
         if (p == null)
         {
@@ -102,7 +90,7 @@ public class ProjectsController : ControllerBase
         }
 
         var normalizedCode = request.Code.Trim().ToUpperInvariant();
-        var exists = await _dbContext.Projects.AnyAsync(p => p.Code == normalizedCode, ct);
+        var exists = await _projectRepository.CodeExistsAsync(normalizedCode, ct);
         if (exists)
         {
             return Conflict(new { message = $"A project with code '{normalizedCode}' already exists." });
@@ -122,8 +110,8 @@ public class ProjectsController : ControllerBase
             IsSimulatedMode = request.IsSimulatedMode
         };
 
-        _dbContext.Projects.Add(project);
-        await _dbContext.SaveChangesAsync(ct);
+        _projectRepository.Add(project);
+        await _projectRepository.SaveChangesAsync(ct);
 
         var dto = new ProjectDto(
             project.Id,
@@ -153,10 +141,7 @@ public class ProjectsController : ControllerBase
         [FromBody] UpdateProjectDto request,
         CancellationToken ct)
     {
-        var project = await _dbContext.Projects
-            .Include(p => p.Members)
-            .Include(p => p.WorkItems)
-            .FirstOrDefaultAsync(p => p.Id == id, ct);
+        var project = await _projectRepository.GetByIdWithDetailsAsync(id, trackChanges: true, ct);
 
         if (project == null)
         {
@@ -179,7 +164,7 @@ public class ProjectsController : ControllerBase
         }
 
         project.UpdatedAt = DateTimeOffset.UtcNow;
-        await _dbContext.SaveChangesAsync(ct);
+        await _projectRepository.SaveChangesAsync(ct);
 
         var dto = new ProjectDto(
             project.Id,
@@ -205,18 +190,13 @@ public class ProjectsController : ControllerBase
     [HttpGet("{id:guid}/members")]
     public async Task<ActionResult<List<ProjectMemberDto>>> GetMembers([FromRoute] Guid id, CancellationToken ct)
     {
-        var projectExists = await _dbContext.Projects.AnyAsync(p => p.Id == id, ct);
+        var projectExists = await _projectRepository.ExistsAsync(id, ct);
         if (!projectExists)
         {
             return NotFound(new { message = $"Project with ID '{id}' not found." });
         }
 
-        var members = await _dbContext.ProjectMembers
-            .AsNoTracking()
-            .Include(pm => pm.Employee)
-            .Where(pm => pm.ProjectId == id)
-            .OrderBy(pm => pm.Employee.FullName)
-            .ToListAsync(ct);
+        var members = await _projectRepository.GetMembersWithEmployeeAsync(id, ct);
 
         var result = members.Select(m => new ProjectMemberDto(
             m.Id,
@@ -241,19 +221,19 @@ public class ProjectsController : ControllerBase
         [FromBody] AddProjectMemberDto request,
         CancellationToken ct)
     {
-        var project = await _dbContext.Projects.FindAsync(new object[] { id }, ct);
+        var project = await _projectRepository.GetByIdAsync(id, trackChanges: false, ct);
         if (project == null)
         {
             return NotFound(new { message = $"Project with ID '{id}' not found." });
         }
 
-        var employee = await _dbContext.Employees.FindAsync(new object[] { request.EmployeeId }, ct);
+        var employee = await _employeeRepository.GetByIdAsync(request.EmployeeId, ct);
         if (employee == null)
         {
             return NotFound(new { message = $"Employee with ID '{request.EmployeeId}' not found." });
         }
 
-        var alreadyMember = await _dbContext.ProjectMembers.AnyAsync(pm => pm.ProjectId == id && pm.EmployeeId == request.EmployeeId, ct);
+        var alreadyMember = await _projectRepository.IsMemberAsync(id, request.EmployeeId, ct);
         if (alreadyMember)
         {
             return Conflict(new { message = "Employee is already assigned to this project." });
@@ -267,8 +247,8 @@ public class ProjectsController : ControllerBase
             JoinedAt = DateTimeOffset.UtcNow
         };
 
-        _dbContext.ProjectMembers.Add(member);
-        await _dbContext.SaveChangesAsync(ct);
+        _projectRepository.AddMember(member);
+        await _projectRepository.SaveChangesAsync(ct);
 
         var dto = new ProjectMemberDto(
             member.Id,
@@ -293,16 +273,15 @@ public class ProjectsController : ControllerBase
         [FromRoute] Guid employeeId,
         CancellationToken ct)
     {
-        var member = await _dbContext.ProjectMembers
-            .FirstOrDefaultAsync(pm => pm.ProjectId == id && pm.EmployeeId == employeeId, ct);
+        var member = await _projectRepository.GetMemberAsync(id, employeeId, trackChanges: true, ct);
 
         if (member == null)
         {
             return NotFound(new { message = "Project membership not found." });
         }
 
-        _dbContext.ProjectMembers.Remove(member);
-        await _dbContext.SaveChangesAsync(ct);
+        _projectRepository.RemoveMember(member);
+        await _projectRepository.SaveChangesAsync(ct);
 
         return NoContent();
     }
@@ -311,7 +290,7 @@ public class ProjectsController : ControllerBase
     [Authorize(Policy = "TeamLeadOrAbove")]
     public async Task<ActionResult<ProjectExternalConfigDto>> GetExternalConfig([FromRoute] Guid id, CancellationToken ct)
     {
-        var project = await _dbContext.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
+        var project = await _projectRepository.GetByIdAsync(id, trackChanges: false, ct);
         if (project == null)
         {
             return NotFound(new { message = $"Project with ID '{id}' not found." });
@@ -338,7 +317,7 @@ public class ProjectsController : ControllerBase
         [FromBody] UpdateProjectExternalConfigDto request,
         CancellationToken ct)
     {
-        var project = await _dbContext.Projects.FirstOrDefaultAsync(p => p.Id == id, ct);
+        var project = await _projectRepository.GetByIdAsync(id, trackChanges: true, ct);
         if (project == null)
         {
             return NotFound(new { message = $"Project with ID '{id}' not found." });
@@ -356,7 +335,7 @@ public class ProjectsController : ControllerBase
         }
 
         project.UpdatedAt = DateTimeOffset.UtcNow;
-        await _dbContext.SaveChangesAsync(ct);
+        await _projectRepository.SaveChangesAsync(ct);
 
         var dto = new ProjectExternalConfigDto(
             project.Id,

@@ -107,6 +107,38 @@ export interface UpsertSkillRequestDto {
   yearsOfExperience?: number;
 }
 
+export interface CreateEmployeeRequestDto {
+  fullName: string;
+  email: string;
+  department: string;
+  jobTitle: string;
+  seniorityRank: SeniorityRank;
+  role: AppRole;
+  annualBaseSalary: number;
+  hourlyCostRate: number;
+  hourlyBillableRate: number;
+  weeklyCapacityHours: number;
+  targetUtilizationPercent: number;
+  avatarUrl?: string | null;
+  bio?: string | null;
+}
+
+export interface UpdateEmployeeRequestDto {
+  fullName: string;
+  email: string;
+  department: string;
+  jobTitle: string;
+  seniorityRank: SeniorityRank;
+  role: AppRole;
+  annualBaseSalary: number;
+  hourlyCostRate: number;
+  hourlyBillableRate: number;
+  weeklyCapacityHours: number;
+  targetUtilizationPercent: number;
+  avatarUrl?: string | null;
+  bio?: string | null;
+}
+
 // Project DTOs
 export interface ProjectDto {
   id: string;

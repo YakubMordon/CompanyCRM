@@ -148,3 +148,35 @@ public record UpsertSkillRequestDto(
     int ProficiencyLevel,
     decimal YearsOfExperience = 1.0m
 );
+
+public record CreateEmployeeRequestDto(
+    string FullName,
+    string Email,
+    string Department,
+    string JobTitle,
+    SeniorityRank SeniorityRank = SeniorityRank.Mid,
+    AppRole Role = AppRole.Employee,
+    decimal AnnualBaseSalary = 0.0m,
+    decimal HourlyCostRate = 0.0m,
+    decimal HourlyBillableRate = 0.0m,
+    decimal WeeklyCapacityHours = 40.0m,
+    decimal TargetUtilizationPercent = 80.0m,
+    string? AvatarUrl = null,
+    string? Bio = null
+);
+
+public record UpdateEmployeeRequestDto(
+    string FullName,
+    string Email,
+    string Department,
+    string JobTitle,
+    SeniorityRank SeniorityRank,
+    AppRole Role,
+    decimal AnnualBaseSalary,
+    decimal HourlyCostRate,
+    decimal HourlyBillableRate,
+    decimal WeeklyCapacityHours,
+    decimal TargetUtilizationPercent,
+    string? AvatarUrl = null,
+    string? Bio = null
+);

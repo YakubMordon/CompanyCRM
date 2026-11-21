@@ -69,3 +69,50 @@ export const manualTimeEntrySchema = z.object({
     .optional()
     .or(z.literal('')),
 });
+
+export const employeeManagementSchema = z.object({
+  fullName: z
+    .string()
+    .trim()
+    .min(1, 'Full name is required.')
+    .max(LIMITS.fullNameMax, `Full name cannot exceed ${LIMITS.fullNameMax} characters.`),
+  email: z
+    .string()
+    .trim()
+    .min(1, 'Email is required.')
+    .max(LIMITS.emailMax, `Email cannot exceed ${LIMITS.emailMax} characters.`)
+    .email('Please enter a valid email address.'),
+  department: z
+    .string()
+    .trim()
+    .min(1, 'Department is required.')
+    .max(LIMITS.departmentMax, `Department cannot exceed ${LIMITS.departmentMax} characters.`),
+  jobTitle: z
+    .string()
+    .trim()
+    .min(1, 'Job title is required.')
+    .max(LIMITS.jobTitleMax, `Job title cannot exceed ${LIMITS.jobTitleMax} characters.`),
+  annualBaseSalary: z
+    .number()
+    .min(LIMITS.salaryMin, 'Base salary must be non-negative.'),
+  hourlyCostRate: z
+    .number()
+    .min(LIMITS.rateMin, 'Hourly cost rate must be non-negative.'),
+  hourlyBillableRate: z
+    .number()
+    .min(LIMITS.rateMin, 'Hourly billable rate must be non-negative.'),
+  weeklyCapacityHours: z
+    .number()
+    .min(LIMITS.capacityMin, `Weekly capacity must be at least ${LIMITS.capacityMin} hour.`)
+    .max(LIMITS.capacityMax, `Weekly capacity cannot exceed ${LIMITS.capacityMax} hours.`),
+  targetUtilizationPercent: z
+    .number()
+    .min(LIMITS.utilizationMin, 'Target utilization must be at least 0%.')
+    .max(LIMITS.utilizationMax, 'Target utilization cannot exceed 100%.'),
+  bio: z
+    .string()
+    .trim()
+    .max(LIMITS.bioMax, `Bio cannot exceed ${LIMITS.bioMax} characters.`)
+    .optional()
+    .or(z.literal('')),
+});

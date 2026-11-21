@@ -3,11 +3,9 @@ using CompanyCRM.Application.DTOs;
 using CompanyCRM.Application.Interfaces;
 using CompanyCRM.Domain.Entities;
 using CompanyCRM.Domain.Enums;
-using CompanyCRM.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
 
 namespace CompanyCRM.Api.Controllers;
 
@@ -16,16 +14,16 @@ public class SyncController : ControllerBase
 {
     private readonly ISyncOrchestratorService _syncOrchestrator;
     private readonly IHubContext<CrmHub, ICrmHubClient> _hubContext;
-    private readonly CrmDbContext _dbContext;
+    private readonly IWorkItemRepository _workItemRepository;
 
     public SyncController(
         ISyncOrchestratorService syncOrchestrator,
         IHubContext<CrmHub, ICrmHubClient> hubContext,
-        CrmDbContext dbContext)
+        IWorkItemRepository workItemRepository)
     {
         _syncOrchestrator = syncOrchestrator;
         _hubContext = hubContext;
-        _dbContext = dbContext;
+        _workItemRepository = workItemRepository;
     }
 
     [HttpPost("api/webhooks/ado")]
@@ -181,11 +179,8 @@ public class SyncController : ControllerBase
                 ? await LoadWorkItemDtoAsync(result.ResolvedWorkItemId.Value, ct)
                 : null;
             var projectId = workItemDto?.ProjectId
-                ?? await _dbContext.SyncConflicts
-                    .AsNoTracking()
-                    .Where(c => c.Id == id)
-                    .Select(c => c.ProjectId)
-                    .FirstOrDefaultAsync(ct);
+                ?? await _workItemRepository.GetConflictProjectIdAsync(id, ct)
+                ?? Guid.Empty;
 
             var groups = CrmHub.ProjectAndUnscopedGroups(projectId);
             await _hubContext.Clients.Groups(groups).SyncStatusChanged(new SyncEventDto(
@@ -216,14 +211,7 @@ public class SyncController : ControllerBase
 
     private async Task<WorkItemDto?> LoadWorkItemDtoAsync(Guid workItemId, CancellationToken ct)
     {
-        var w = await _dbContext.WorkItems
-            .AsNoTracking()
-            .Include(x => x.Project)
-            .Include(x => x.CreatedBy)
-            .Include(x => x.Assignee)
-            .Include(x => x.Reviewer)
-            .Include(x => x.TimeEntries)
-            .FirstOrDefaultAsync(x => x.Id == workItemId, ct);
+        var w = await _workItemRepository.GetByIdWithDetailsAsync(workItemId, trackChanges: false, ct);
 
         if (w == null) return null;
 

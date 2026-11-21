@@ -46,6 +46,12 @@ public static class ServiceCollectionExtensions
         // 2. Database Seeder
         services.AddScoped<DatabaseSeeder>();
 
+        // Repositories
+        services.AddScoped<IEmployeeRepository, Persistence.Repositories.EmployeeRepository>();
+        services.AddScoped<IProjectRepository, Persistence.Repositories.ProjectRepository>();
+        services.AddScoped<IWorkItemRepository, Persistence.Repositories.WorkItemRepository>();
+        services.AddScoped<IPlanningRepository, Persistence.Repositories.PlanningRepository>();
+
         // 3. Azure DevOps Integration & Simulator
         services.AddSingleton<AzureDevOpsSimulator>();
 

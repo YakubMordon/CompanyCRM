@@ -6,18 +6,47 @@ import {
   getApiManagementAnalyticsCompletionRates,
   getApiManagementAnalyticsBurndown,
 } from '../api/generated';
+import { customInstance } from '../api/mutator';
 import {
   BurndownDto,
   CompletionRateDto,
+  CreateEmployeeRequestDto,
   EmployeeCompensationDto,
   HoursComparisonDto,
   ProjectProfitabilityDto,
   SprintVelocityDto,
+  UpdateEmployeeRequestDto,
 } from '../types';
 
 export const managementApi = {
   getCompensation: async (): Promise<EmployeeCompensationDto[]> => {
     return (await getApiManagementCompensation()) as EmployeeCompensationDto[];
+  },
+
+  createEmployee: async (dto: CreateEmployeeRequestDto): Promise<EmployeeCompensationDto> => {
+    return await customInstance<EmployeeCompensationDto>({
+      url: '/api/management/employees',
+      method: 'POST',
+      data: dto,
+    });
+  },
+
+  updateEmployee: async (
+    id: string,
+    dto: UpdateEmployeeRequestDto
+  ): Promise<EmployeeCompensationDto> => {
+    return await customInstance<EmployeeCompensationDto>({
+      url: `/api/management/employees/${id}`,
+      method: 'PUT',
+      data: dto,
+    });
+  },
+
+  deleteEmployee: async (id: string): Promise<void> => {
+    await customInstance<void>({
+      url: `/api/management/employees/${id}`,
+      method: 'DELETE',
+    });
   },
 
   getProfitability: async (
