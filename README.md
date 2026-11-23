@@ -44,7 +44,17 @@
 
 ### 2. Work Item Lifecycle & Review Governance
 - Enforces a rigorous 9-stage status state machine:
-  $$\text{Draft} \longrightarrow \text{PendingReview} \longrightarrow \begin{cases} \text{ClarificationRequested} \\ \text{Denied} \\ \text{Approved} \longrightarrow \text{Backlog} \longrightarrow \text{Todo} \longrightarrow \text{InProgress} \longrightarrow \text{InVerify} \longrightarrow \text{Done} \end{cases}$$
+
+
+Draft → PendingReview → {
+
+    ClarificationRequested
+    
+    Denied
+    
+    Approved → Backlog → Todo → InProgress → InVerify → Done
+}
+
 - Team leads and higher management can inspect incoming submissions in the **Review Queue**, attach revision notes, and grant approvals before work enters active sprints.
 - Complete audit history logging records every property change, actor, and timestamp.
 
