@@ -1,11 +1,11 @@
 # CompanyCRM
 
-[![.NET 9](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![React 19](https://img.shields.io/badge/React-19.0-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.0-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Material UI](https://img.shields.io/badge/MUI-v6-007FFF?logo=mui&logoColor=white)](https://mui.com/)
-[![EF Core 9](https://img.shields.io/badge/EF%20Core-9.0-512BD4?logo=dotnet&logoColor=white)](https://learn.microsoft.com/ef/core/)
+[![EF Core 10](https://img.shields.io/badge/EF%20Core-10.0-512BD4?logo=dotnet&logoColor=white)](https://learn.microsoft.com/ef/core/)
 [![.NET Aspire](https://img.shields.io/badge/.NET%20Aspire-9.0-512BD4?logo=dotnet&logoColor=white)](https://learn.microsoft.com/dotnet/aspire/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Ready-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-Fallback-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
@@ -13,7 +13,7 @@
 [![SignalR](https://img.shields.io/badge/SignalR-Real--Time-blue)](https://dotnet.microsoft.com/apps/aspnet/signalr)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE.txt)
 
-**CompanyCRM** is a modern, enterprise-grade CRM, Project Management, and Time-Tracking platform designed to bridge executive leadership, project managers, and software delivery teams. Built on **Clean Architecture**, **.NET 9**, and **React 19**, it offers end-to-end work item governance, automated planning cutoff enforcement, real-time profitability analytics, and bidirectional external issue synchronization.
+**CompanyCRM** is a modern, enterprise-grade CRM, Project Management, and Time-Tracking platform designed to bridge executive leadership, project managers, and software delivery teams. Built on **Clean Architecture**, **.NET 10**, and **React 19**, it offers end-to-end work item governance, automated planning cutoff enforcement, real-time profitability analytics, and bidirectional external issue synchronization.
 
 ---
 
@@ -138,9 +138,9 @@ graph TD
 
 | Tier | Technologies |
 | :--- | :--- |
-| **Backend Framework** | .NET 9, ASP.NET Core Web API, C# 13 |
+| **Backend Framework** | .NET 10, ASP.NET Core Web API, C# 13 / 14 |
 | **Architecture** | Clean Architecture / Domain-Driven Design (Domain, Application, Infrastructure, Api) |
-| **Data & ORM** | Entity Framework Core 9, Npgsql (PostgreSQL), Microsoft.EntityFrameworkCore.Sqlite |
+| **Data & ORM** | Entity Framework Core 10, Npgsql (PostgreSQL), Microsoft.EntityFrameworkCore.Sqlite |
 | **Background Scheduling** | Hangfire (Memory Storage), Recurring Jobs |
 | **Real-Time Push** | ASP.NET Core SignalR |
 | **Email Delivery** | MailKit (SMTP / MailPit) with in-database fallback logging |

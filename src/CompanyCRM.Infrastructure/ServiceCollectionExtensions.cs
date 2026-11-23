@@ -52,18 +52,30 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IWorkItemRepository, Persistence.Repositories.WorkItemRepository>();
         services.AddScoped<IPlanningRepository, Persistence.Repositories.PlanningRepository>();
 
-        // 3. Azure DevOps Integration & Simulator
+        // 3. External Issue Tracker Integrations & Simulators (Azure DevOps & Jira)
         services.AddSingleton<AzureDevOpsSimulator>();
-
         services.AddHttpClient<AzureDevOpsIssueTrackerProvider>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);
         });
 
+        services.AddSingleton<JiraSimulator>();
+        services.AddHttpClient<JiraIssueTrackerProvider>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+
         services.AddScoped<IIssueTrackerProvider>(sp => sp.GetRequiredService<AzureDevOpsIssueTrackerProvider>());
+        services.AddScoped<IIssueTrackerProvider>(sp => sp.GetRequiredService<JiraIssueTrackerProvider>());
 
         // 4. Sync Orchestrator Service
-        services.AddScoped<ISyncOrchestratorService, SyncOrchestratorService>();
+        services.AddScoped<ISyncOrchestratorService>(sp =>
+        {
+            var dbContext = sp.GetRequiredService<CrmDbContext>();
+            var providers = sp.GetServices<IIssueTrackerProvider>();
+            var logger = sp.GetRequiredService<ILogger<SyncOrchestratorService>>();
+            return new SyncOrchestratorService(dbContext, providers, logger);
+        });
 
         // 5. Work Item Review Service
         services.AddScoped<IWorkItemReviewService, WorkItemReviewService>();

@@ -87,6 +87,67 @@ public class SyncController : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost("api/webhooks/jira")]
+    [AllowAnonymous]
+    public async Task<ActionResult<WebhookProcessingResultDto>> ProcessJiraWebhook(CancellationToken ct)
+    {
+        using var reader = new StreamReader(Request.Body);
+        var rawPayload = await reader.ReadToEndAsync(ct);
+
+        if (string.IsNullOrWhiteSpace(rawPayload))
+        {
+            return BadRequest(new WebhookProcessingResultDto("Error", null, null, false, "Empty payload"));
+        }
+
+        var headers = Request.Headers.ToDictionary(h => h.Key, h => h.Value.ToString());
+
+        var result = await _syncOrchestrator.ProcessInboundWebhookAsync(
+            ExternalSourceType.Jira,
+            rawPayload,
+            headers,
+            ct);
+
+        if (result.Status == "ConflictDetected")
+        {
+            var conflictProjectId = result.Conflict?.ProjectId ?? Guid.Empty;
+            await _hubContext.Clients.Groups(CrmHub.ProjectAndUnscopedGroups(conflictProjectId)).SyncStatusChanged(new SyncEventDto(
+                conflictProjectId,
+                result.WorkItemId,
+                "ConflictDetected",
+                result.Message,
+                result.ExternalId,
+                DateTimeOffset.UtcNow
+            ));
+        }
+        else if (!result.IsEcho && result.Status == "Applied")
+        {
+            var workItemDto = result.WorkItemId.HasValue
+                ? await LoadWorkItemDtoAsync(result.WorkItemId.Value, ct)
+                : null;
+            var projectId = workItemDto?.ProjectId ?? Guid.Empty;
+            var syncStatus = result.Message.Contains("Imported", StringComparison.OrdinalIgnoreCase)
+                ? "WorkItemImported"
+                : "SyncCompleted";
+
+            var groups = CrmHub.ProjectAndUnscopedGroups(projectId);
+            await _hubContext.Clients.Groups(groups).SyncStatusChanged(new SyncEventDto(
+                projectId,
+                result.WorkItemId,
+                syncStatus,
+                result.Message,
+                result.ExternalId,
+                DateTimeOffset.UtcNow
+            ));
+
+            if (workItemDto != null)
+            {
+                await _hubContext.Clients.Groups(groups).WorkItemUpdated(workItemDto);
+            }
+        }
+
+        return Ok(result);
+    }
+
     [HttpPost("api/sync/projects/{id:guid}/reconcile")]
     [Authorize]
     public async Task<ActionResult<ReconciliationResultDto>> ReconcileProject([FromRoute] Guid id, CancellationToken ct)

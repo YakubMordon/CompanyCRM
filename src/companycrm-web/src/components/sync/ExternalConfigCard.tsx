@@ -8,10 +8,10 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
+import MenuItem from '@mui/material/MenuItem';
 import SettingsIcon from '@mui/icons-material/Settings';
 import CloudQueueIcon from '@mui/icons-material/CloudQueue';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { ProjectExternalConfigDto, UpdateProjectExternalConfigDto } from '../../types';
+import { ExternalSourceType, ProjectExternalConfigDto, UpdateProjectExternalConfigDto } from '../../types';
 import { projectsApi } from '../../services/projectsApi';
 
 interface ExternalConfigCardProps {
@@ -21,6 +21,7 @@ interface ExternalConfigCardProps {
 export const ExternalConfigCard: React.FC<ExternalConfigCardProps> = ({ projectId }) => {
   const [config, setConfig] = useState<ProjectExternalConfigDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sourceType, setSourceType] = useState<ExternalSourceType>('AzureDevOps');
   const [orgUrl, setOrgUrl] = useState('');
   const [projectName, setProjectName] = useState('');
   const [pat, setPat] = useState('');
@@ -38,8 +39,10 @@ export const ExternalConfigCard: React.FC<ExternalConfigCardProps> = ({ projectI
       .then((cfg) => {
         if (!isMounted) return;
         setConfig(cfg);
-        setOrgUrl(cfg.externalOrgUrl || 'https://dev.azure.com/contoso-crm');
-        setProjectName(cfg.externalProjectName || 'CompanyCRM');
+        const resolvedSource = cfg.externalSource === 'Jira' ? 'Jira' : 'AzureDevOps';
+        setSourceType(resolvedSource);
+        setOrgUrl(cfg.externalOrgUrl || (resolvedSource === 'Jira' ? 'https://company.atlassian.net' : 'https://dev.azure.com/contoso-crm'));
+        setProjectName(cfg.externalProjectName || (resolvedSource === 'Jira' ? 'CRM' : 'CompanyCRM'));
         setPat('');
         setIsSimulatedMode(cfg.isSimulatedMode);
         setIsSyncEnabled(cfg.isSyncEnabled);
@@ -56,6 +59,25 @@ export const ExternalConfigCard: React.FC<ExternalConfigCardProps> = ({ projectI
     };
   }, [projectId]);
 
+  const handleSourceTypeChange = (newSource: ExternalSourceType) => {
+    setSourceType(newSource);
+    if (newSource === 'Jira') {
+      if (!orgUrl || orgUrl.includes('dev.azure.com')) {
+        setOrgUrl('https://company.atlassian.net');
+      }
+      if (!projectName || projectName === 'CompanyCRM') {
+        setProjectName('CRM');
+      }
+    } else {
+      if (!orgUrl || orgUrl.includes('atlassian.net')) {
+        setOrgUrl('https://dev.azure.com/contoso-crm');
+      }
+      if (!projectName || projectName === 'CRM') {
+        setProjectName('CompanyCRM');
+      }
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -64,7 +86,7 @@ export const ExternalConfigCard: React.FC<ExternalConfigCardProps> = ({ projectI
 
     try {
       const dto: UpdateProjectExternalConfigDto = {
-        externalSource: 'AzureDevOps',
+        externalSource: sourceType,
         externalOrgUrl: orgUrl.trim() || null,
         externalProjectName: projectName.trim() || null,
         externalPat: pat.trim() || null,
@@ -75,7 +97,7 @@ export const ExternalConfigCard: React.FC<ExternalConfigCardProps> = ({ projectI
 
       const updated = await projectsApi.updateExternalConfig(projectId, dto);
       setConfig(updated);
-      setSaveSuccess('Azure DevOps configuration saved successfully.');
+      setSaveSuccess(`${sourceType === 'Jira' ? 'Jira' : 'Azure DevOps'} configuration saved successfully.`);
     } catch (err: any) {
       setSaveError(err?.response?.data?.detail || err?.message || 'Failed to save configuration.');
     } finally {
@@ -91,12 +113,14 @@ export const ExternalConfigCard: React.FC<ExternalConfigCardProps> = ({ projectI
     );
   }
 
+  const isJira = sourceType === 'Jira';
+
   return (
     <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
         <CloudQueueIcon color="primary" />
         <Typography variant="h6" sx={{ fontWeight: 700 }}>
-          Azure DevOps Integration Provider
+          {isJira ? 'Jira Cloud / Data Center Provider' : 'Azure DevOps Integration Provider'}
         </Typography>
       </Box>
 
@@ -125,10 +149,10 @@ export const ExternalConfigCard: React.FC<ExternalConfigCardProps> = ({ projectI
               label={
                 <Box>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                    Simulated Sandbox Mode ({isSimulatedMode ? 'ACTIVE' : 'LIVE PAT'})
+                    Simulated Sandbox Mode ({isSimulatedMode ? 'ACTIVE' : 'LIVE API'})
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Runs deterministic offline Azure DevOps sync with realistic work items, mock
+                    Runs deterministic offline {isJira ? 'Jira' : 'Azure DevOps'} sync with realistic work items, mock
                     webhooks, and conflict deduplication locally without needing live credentials.
                   </Typography>
                 </Box>
@@ -138,8 +162,20 @@ export const ExternalConfigCard: React.FC<ExternalConfigCardProps> = ({ projectI
 
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
             <TextField
+              select
               size="small"
-              label="Azure DevOps Organization URL"
+              label="Issue Tracker Provider"
+              value={sourceType}
+              onChange={(e) => handleSourceTypeChange(e.target.value as ExternalSourceType)}
+              sx={{ minWidth: 220 }}
+            >
+              <MenuItem value="AzureDevOps">Azure DevOps Boards</MenuItem>
+              <MenuItem value="Jira">Atlassian Jira (Cloud / Data Center)</MenuItem>
+            </TextField>
+
+            <TextField
+              size="small"
+              label={isJira ? 'Jira Host URL (e.g. https://your-domain.atlassian.net)' : 'Azure DevOps Organization URL'}
               value={orgUrl}
               onChange={(e) => setOrgUrl(e.target.value)}
               sx={{ flexGrow: 1, minWidth: 260 }}
@@ -148,10 +184,10 @@ export const ExternalConfigCard: React.FC<ExternalConfigCardProps> = ({ projectI
 
             <TextField
               size="small"
-              label="Project Name"
+              label={isJira ? 'Jira Project Key (e.g. CRM)' : 'Project Name'}
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
-              sx={{ flexGrow: 1, minWidth: 200 }}
+              sx={{ minWidth: 180 }}
               required
             />
           </Box>
@@ -162,8 +198,8 @@ export const ExternalConfigCard: React.FC<ExternalConfigCardProps> = ({ projectI
               type="password"
               label={
                 config?.hasPatConfigured || config?.personalAccessTokenMasked
-                  ? `PAT (Configured: ${config.personalAccessTokenMasked || '***'})`
-                  : 'Personal Access Token (PAT)'
+                  ? `Token (${isJira ? 'API Token/PAT' : 'PAT'} Configured: ${config.personalAccessTokenMasked || '***'})`
+                  : isJira ? 'API Token or Bearer PAT' : 'Personal Access Token (PAT)'
               }
               placeholder="Enter new token to update..."
               value={pat}

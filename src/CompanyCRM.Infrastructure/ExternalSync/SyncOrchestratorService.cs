@@ -14,17 +14,48 @@ namespace CompanyCRM.Infrastructure.ExternalSync;
 public class SyncOrchestratorService : ISyncOrchestratorService
 {
     private readonly CrmDbContext _dbContext;
-    private readonly IIssueTrackerProvider _provider;
+    private readonly IReadOnlyDictionary<ExternalSourceType, IIssueTrackerProvider> _providers;
+    private readonly IIssueTrackerProvider? _defaultProvider;
     private readonly ILogger<SyncOrchestratorService> _logger;
 
     public SyncOrchestratorService(
         CrmDbContext dbContext,
         IIssueTrackerProvider provider,
         ILogger<SyncOrchestratorService> logger)
+        : this(dbContext, new[] { provider }, logger)
+    {
+    }
+
+    [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
+    public SyncOrchestratorService(
+        CrmDbContext dbContext,
+        IEnumerable<IIssueTrackerProvider> providers,
+        ILogger<SyncOrchestratorService> logger)
     {
         _dbContext = dbContext;
-        _provider = provider;
+        var dict = new Dictionary<ExternalSourceType, IIssueTrackerProvider>();
+        foreach (var p in providers)
+        {
+            dict[p.SourceType] = p;
+        }
+        _providers = dict;
+        _defaultProvider = dict.Values.FirstOrDefault();
         _logger = logger;
+    }
+
+    private IIssueTrackerProvider GetProvider(ExternalSourceType sourceType)
+    {
+        if (_providers.TryGetValue(sourceType, out var provider))
+        {
+            return provider;
+        }
+
+        if (_defaultProvider != null)
+        {
+            return _defaultProvider;
+        }
+
+        throw new NotSupportedException($"No issue tracker provider registered for source type: {sourceType}");
     }
 
     public async Task<SyncResultDto> PushWorkItemToExternalAsync(Guid workItemId, CancellationToken ct = default)
@@ -72,7 +103,8 @@ public class SyncOrchestratorService : ISyncOrchestratorService
             project.IsSimulatedMode,
             project.LastSyncRunAt);
 
-        var externalDto = await _provider.PushWorkItemAsync(config, item, ct);
+        var provider = GetProvider(project.ExternalSource);
+        var externalDto = await provider.PushWorkItemAsync(config, item, ct);
 
         item.ExternalSource = project.ExternalSource;
         item.ExternalId = externalDto.ExternalId;
@@ -113,7 +145,8 @@ public class SyncOrchestratorService : ISyncOrchestratorService
         IDictionary<string, string> headers,
         CancellationToken ct = default)
     {
-        var parsedDto = await _provider.ParseWebhookPayloadAsync(rawPayload, headers, ct);
+        var provider = GetProvider(source);
+        var parsedDto = await provider.ParseWebhookPayloadAsync(rawPayload, headers, ct);
         if (parsedDto == null || string.IsNullOrWhiteSpace(parsedDto.ExternalId))
         {
             return new WebhookProcessingResultDto(
@@ -351,7 +384,8 @@ public class SyncOrchestratorService : ISyncOrchestratorService
                     project.IsSimulatedMode,
                     project.LastSyncRunAt);
 
-                var remoteItems = await _provider.FetchRemoteWorkItemsAsync(config, project.LastSyncRunAt, ct);
+                var provider = GetProvider(project.ExternalSource);
+                var remoteItems = await provider.FetchRemoteWorkItemsAsync(config, project.LastSyncRunAt, ct);
 
                 foreach (var remote in remoteItems)
                 {
