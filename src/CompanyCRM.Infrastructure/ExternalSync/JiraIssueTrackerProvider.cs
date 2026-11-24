@@ -45,17 +45,37 @@ public class JiraIssueTrackerProvider : IIssueTrackerProvider
         var projectKey = config.ProjectName?.Trim().ToUpperInvariant() ?? "CRM";
 
         var authHeader = CreateAuthHeader(config.Pat);
-
         var jiraIssueType = MapTypeToJira(workItem.Type);
         var jiraStatus = MapStatusToJira(workItem.Status);
         var jiraPriority = MapPriorityToJira(workItem.Priority);
 
-        HttpRequestMessage request;
+        var request = CreatePushHttpRequest(baseUrl, projectKey, workItem, jiraIssueType, jiraPriority);
+        request.Headers.Authorization = authHeader;
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        var response = await _httpClient.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(ct);
+            _logger.LogError("Jira API error ({StatusCode}): {Body}", response.StatusCode, errorBody);
+            throw new HttpRequestException($"Jira API error: {response.StatusCode} - {errorBody}");
+        }
+
+        var responseJson = await response.Content.ReadAsStringAsync(ct);
+        return ParseJiraResponseJson(responseJson, baseUrl, workItem, jiraStatus, jiraIssueType);
+    }
+
+    private static HttpRequestMessage CreatePushHttpRequest(
+        string baseUrl,
+        string projectKey,
+        WorkItem workItem,
+        string jiraIssueType,
+        string jiraPriority)
+    {
         if (string.IsNullOrWhiteSpace(workItem.ExternalId))
         {
-            // Create new issue via POST /rest/api/2/issue
             var requestUri = $"{baseUrl}/rest/api/2/issue";
-            request = new HttpRequestMessage(HttpMethod.Post, requestUri);
+            var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
 
             var createPayload = new
             {
@@ -75,12 +95,12 @@ public class JiraIssueTrackerProvider : IIssueTrackerProvider
             }
 
             request.Content = new StringContent(JsonSerializer.Serialize(createPayload), Encoding.UTF8, "application/json");
+            return request;
         }
         else
         {
-            // Update existing issue via PUT /rest/api/2/issue/{issueIdOrKey}
             var requestUri = $"{baseUrl}/rest/api/2/issue/{Uri.EscapeDataString(workItem.ExternalId)}";
-            request = new HttpRequestMessage(HttpMethod.Put, requestUri);
+            var request = new HttpRequestMessage(HttpMethod.Put, requestUri);
 
             var updatePayload = new
             {
@@ -98,21 +118,8 @@ public class JiraIssueTrackerProvider : IIssueTrackerProvider
             }
 
             request.Content = new StringContent(JsonSerializer.Serialize(updatePayload), Encoding.UTF8, "application/json");
+            return request;
         }
-
-        request.Headers.Authorization = authHeader;
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-        var response = await _httpClient.SendAsync(request, ct);
-        if (!response.IsSuccessStatusCode)
-        {
-            var errorBody = await response.Content.ReadAsStringAsync(ct);
-            _logger.LogError("Jira API error ({StatusCode}): {Body}", response.StatusCode, errorBody);
-            throw new HttpRequestException($"Jira API error: {response.StatusCode} - {errorBody}");
-        }
-
-        var responseJson = await response.Content.ReadAsStringAsync(ct);
-        return ParseJiraResponseJson(responseJson, baseUrl, workItem, jiraStatus, jiraIssueType);
     }
 
     public async Task<IReadOnlyList<ExternalWorkItemDto>> FetchRemoteWorkItemsAsync(
@@ -188,57 +195,63 @@ public class JiraIssueTrackerProvider : IIssueTrackerProvider
                 : "https://jira.local";
 
             var externalUrl = $"{baseUrl}/browse/{externalId}";
-
-            string title = string.Empty;
-            string? description = null;
-            string status = "To Do";
-            string type = "Task";
-            string? assigneeEmail = null;
-            DateTimeOffset? updatedDate = null;
-
-            if (issueElement.TryGetProperty("fields", out var fields) && fields.ValueKind == JsonValueKind.Object)
-            {
-                title = GetSafeString(fields, "summary") ?? string.Empty;
-                description = GetSafeString(fields, "description");
-
-                if (fields.TryGetProperty("status", out var statusProp) && statusProp.ValueKind == JsonValueKind.Object)
-                {
-                    status = GetSafeString(statusProp, "name") ?? "To Do";
-                }
-
-                if (fields.TryGetProperty("issuetype", out var typeProp) && typeProp.ValueKind == JsonValueKind.Object)
-                {
-                    type = GetSafeString(typeProp, "name") ?? "Task";
-                }
-
-                if (fields.TryGetProperty("updated", out var updatedProp) &&
-                    updatedProp.ValueKind == JsonValueKind.String &&
-                    updatedProp.TryGetDateTimeOffset(out var uDate))
-                {
-                    updatedDate = uDate;
-                }
-
-                if (fields.TryGetProperty("assignee", out var assigneeProp) && assigneeProp.ValueKind == JsonValueKind.Object)
-                {
-                    assigneeEmail = GetSafeString(assigneeProp, "emailAddress") ?? GetSafeString(assigneeProp, "name");
-                }
-            }
+            var fieldsData = ParseWebhookFields(issueElement);
 
             return Task.FromResult<ExternalWorkItemDto?>(new ExternalWorkItemDto(
                 ExternalId: externalId,
                 ExternalUrl: externalUrl,
-                Title: title,
-                Description: description,
-                Status: status,
-                Type: type,
-                AssigneeEmail: assigneeEmail,
-                LastModifiedAt: updatedDate ?? DateTimeOffset.UtcNow));
+                Title: fieldsData.Title,
+                Description: fieldsData.Description,
+                Status: fieldsData.Status,
+                Type: fieldsData.Type,
+                AssigneeEmail: fieldsData.AssigneeEmail,
+                LastModifiedAt: fieldsData.UpdatedDate ?? DateTimeOffset.UtcNow));
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException)
         {
             _logger.LogWarning(ex, "Failed to parse Jira webhook JSON payload");
             return Task.FromResult<ExternalWorkItemDto?>(null);
         }
+    }
+
+    private static (string Title, string? Description, string Status, string Type, string? AssigneeEmail, DateTimeOffset? UpdatedDate) ParseWebhookFields(JsonElement issueElement)
+    {
+        string title = string.Empty;
+        string? description = null;
+        string status = "To Do";
+        string type = "Task";
+        string? assigneeEmail = null;
+        DateTimeOffset? updatedDate = null;
+
+        if (issueElement.TryGetProperty("fields", out var fields) && fields.ValueKind == JsonValueKind.Object)
+        {
+            title = GetSafeString(fields, "summary") ?? string.Empty;
+            description = GetSafeString(fields, "description");
+
+            if (fields.TryGetProperty("status", out var statusProp) && statusProp.ValueKind == JsonValueKind.Object)
+            {
+                status = GetSafeString(statusProp, "name") ?? "To Do";
+            }
+
+            if (fields.TryGetProperty("issuetype", out var typeProp) && typeProp.ValueKind == JsonValueKind.Object)
+            {
+                type = GetSafeString(typeProp, "name") ?? "Task";
+            }
+
+            if (fields.TryGetProperty("updated", out var updatedProp) &&
+                updatedProp.ValueKind == JsonValueKind.String &&
+                updatedProp.TryGetDateTimeOffset(out var uDate))
+            {
+                updatedDate = uDate;
+            }
+
+            if (fields.TryGetProperty("assignee", out var assigneeProp) && assigneeProp.ValueKind == JsonValueKind.Object)
+            {
+                assigneeEmail = GetSafeString(assigneeProp, "emailAddress") ?? GetSafeString(assigneeProp, "name");
+            }
+        }
+
+        return (title, description, status, type, assigneeEmail, updatedDate);
     }
 
     private static AuthenticationHeaderValue CreateAuthHeader(string pat)
@@ -341,53 +354,69 @@ public class JiraIssueTrackerProvider : IIssueTrackerProvider
 
         foreach (var issue in issues.EnumerateArray())
         {
-            var key = issue.GetProperty("key").GetString() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(key)) continue;
-
-            string title = string.Empty;
-            string? description = null;
-            string status = "To Do";
-            string type = "Task";
-            string? assigneeEmail = null;
-            DateTimeOffset? updated = null;
-
-            if (issue.TryGetProperty("fields", out var f) && f.ValueKind == JsonValueKind.Object)
+            var item = ParseJiraSearchItem(issue, baseUrl);
+            if (item != null)
             {
-                title = GetSafeString(f, "summary") ?? string.Empty;
-                description = GetSafeString(f, "description");
-
-                if (f.TryGetProperty("status", out var s) && s.ValueKind == JsonValueKind.Object)
-                {
-                    status = GetSafeString(s, "name") ?? "To Do";
-                }
-
-                if (f.TryGetProperty("issuetype", out var it) && it.ValueKind == JsonValueKind.Object)
-                {
-                    type = GetSafeString(it, "name") ?? "Task";
-                }
-
-                if (f.TryGetProperty("updated", out var u) && u.ValueKind == JsonValueKind.String && u.TryGetDateTimeOffset(out var uVal))
-                {
-                    updated = uVal;
-                }
-
-                if (f.TryGetProperty("assignee", out var a) && a.ValueKind == JsonValueKind.Object)
-                {
-                    assigneeEmail = GetSafeString(a, "emailAddress") ?? GetSafeString(a, "name");
-                }
+                list.Add(item);
             }
-
-            list.Add(new ExternalWorkItemDto(
-                ExternalId: key,
-                ExternalUrl: $"{baseUrl}/browse/{key}",
-                Title: title,
-                Description: description,
-                Status: status,
-                Type: type,
-                AssigneeEmail: assigneeEmail,
-                LastModifiedAt: updated ?? DateTimeOffset.UtcNow));
         }
 
         return list;
+    }
+
+    private static ExternalWorkItemDto? ParseJiraSearchItem(JsonElement issue, string baseUrl)
+    {
+        var key = issue.GetProperty("key").GetString() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(key)) return null;
+
+        var (title, description, status, type, assigneeEmail, updated) = ParseSearchItemFields(issue);
+
+        return new ExternalWorkItemDto(
+            ExternalId: key,
+            ExternalUrl: $"{baseUrl}/browse/{key}",
+            Title: title,
+            Description: description,
+            Status: status,
+            Type: type,
+            AssigneeEmail: assigneeEmail,
+            LastModifiedAt: updated ?? DateTimeOffset.UtcNow);
+    }
+
+    private static (string Title, string? Description, string Status, string Type, string? AssigneeEmail, DateTimeOffset? Updated) ParseSearchItemFields(JsonElement issue)
+    {
+        string title = string.Empty;
+        string? description = null;
+        string status = "To Do";
+        string type = "Task";
+        string? assigneeEmail = null;
+        DateTimeOffset? updated = null;
+
+        if (issue.TryGetProperty("fields", out var f) && f.ValueKind == JsonValueKind.Object)
+        {
+            title = GetSafeString(f, "summary") ?? string.Empty;
+            description = GetSafeString(f, "description");
+
+            if (f.TryGetProperty("status", out var s) && s.ValueKind == JsonValueKind.Object)
+            {
+                status = GetSafeString(s, "name") ?? "To Do";
+            }
+
+            if (f.TryGetProperty("issuetype", out var it) && it.ValueKind == JsonValueKind.Object)
+            {
+                type = GetSafeString(it, "name") ?? "Task";
+            }
+
+            if (f.TryGetProperty("updated", out var u) && u.ValueKind == JsonValueKind.String && u.TryGetDateTimeOffset(out var uVal))
+            {
+                updated = uVal;
+            }
+
+            if (f.TryGetProperty("assignee", out var a) && a.ValueKind == JsonValueKind.Object)
+            {
+                assigneeEmail = GetSafeString(a, "emailAddress") ?? GetSafeString(a, "name");
+            }
+        }
+
+        return (title, description, status, type, assigneeEmail, updated);
     }
 }

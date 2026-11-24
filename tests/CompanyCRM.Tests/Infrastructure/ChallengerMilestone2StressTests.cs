@@ -359,8 +359,8 @@ public class ChallengerMilestone2StressTests : IDisposable
     public void TitleSimilarity_HighSimilarity_ScoresAboveThreshold(string a, string b, double minScore)
     {
         var sim = SyncOrchestratorService.ComputeTitleSimilarity(a, b);
-        sim.Should().BeGreaterOrEqualTo(minScore);
-        sim.Should().BeGreaterOrEqualTo(0.85);
+        sim.Should().BeGreaterThanOrEqualTo(minScore);
+        sim.Should().BeGreaterThanOrEqualTo(0.85);
     }
 
     [Fact]
@@ -374,7 +374,7 @@ public class ChallengerMilestone2StressTests : IDisposable
         var simNearMatch = SyncOrchestratorService.ComputeTitleSimilarity(
             "Implement OAuth2 Authentication Flow in Core Service",
             "Implement OAuth2 Authorization Flow in Core Service");
-        simNearMatch.Should().BeGreaterOrEqualTo(0.85);
+        simNearMatch.Should().BeGreaterThanOrEqualTo(0.85);
 
         // 2. Clear difference: Different features entirely
         var simDivergent = SyncOrchestratorService.ComputeTitleSimilarity(

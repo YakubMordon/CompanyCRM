@@ -156,7 +156,7 @@ public class WorkItemsAndTimerIntegrationTests : IClassFixture<CrmApiTestFixture
         stopResp.StatusCode.Should().Be(HttpStatusCode.OK);
         var stopped = await stopResp.Content.ReadFromJsonAsync<TimeEntryDto>(CrmApiTestFixture.JsonOptions);
         stopped!.IsRunning.Should().BeFalse();
-        stopped.DurationMinutes.Should().BeGreaterOrEqualTo(1);
+        stopped.DurationMinutes.Should().BeGreaterThanOrEqualTo(1);
 
         // Check active timer is now null / 204
         var activeNone = await client.GetAsync("/api/workitems/active-timer");

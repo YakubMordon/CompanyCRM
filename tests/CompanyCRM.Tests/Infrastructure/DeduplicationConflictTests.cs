@@ -66,7 +66,7 @@ public class DeduplicationConflictTests : IDisposable
             "Invoice PDF Generator",
             "PDF Generator Invoice");
 
-        sim.Should().BeGreaterOrEqualTo(0.85);
+        sim.Should().BeGreaterThanOrEqualTo(0.85);
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public class DeduplicationConflictTests : IDisposable
 
         result.Status.Should().Be("ConflictDetected");
         result.Conflict.Should().NotBeNull();
-        result.Conflict!.SimilarityScore.Should().BeGreaterOrEqualTo(0.85);
+        result.Conflict!.SimilarityScore.Should().BeGreaterThanOrEqualTo(0.85);
 
         using var verifyContext = CreateContext();
         var conflictInDb = await verifyContext.SyncConflicts.FirstOrDefaultAsync(c => c.ExternalId == "ADO-EXT-401");

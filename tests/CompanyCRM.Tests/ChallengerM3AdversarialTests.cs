@@ -607,7 +607,7 @@ public class ChallengerM3AdversarialTests : IClassFixture<CrmApiTestFixture>
             savedA.Should().NotBeNull();
             savedA!.IsRunning.Should().BeFalse("Item A timer must be stopped");
             savedA.EndedAt.Should().NotBeNull("Item A timer must have EndedAt set");
-            savedA.DurationMinutes.Should().BeGreaterOrEqualTo(1, "Duration minutes must be at least 1 minute");
+            savedA.DurationMinutes.Should().BeGreaterThanOrEqualTo(1, "Duration minutes must be at least 1 minute");
 
             // Verify Item A history contains TimerStopped with Auto-finalized note
             var historiesA = await db.WorkItemHistories.Where(h => h.WorkItemId == itemA.Id).ToListAsync();
