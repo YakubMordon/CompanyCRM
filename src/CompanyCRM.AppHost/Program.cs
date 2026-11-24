@@ -4,12 +4,12 @@ Environment.SetEnvironmentVariable("ASPNETCORE_PREVENTHOSTINGSTARTUP", "true");
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var api = builder.AddProject<Projects.CompanyCRM_Api>("api")
+var api = builder.AddDotnetProject("api", "../CompanyCRM.Api/CompanyCRM.Api.csproj")
     .WithExternalHttpEndpoints()
     .WithEnvironment("ASPNETCORE_HOSTINGSTARTUPASSEMBLIES", "")
     .WithEnvironment("ASPNETCORE_PREVENTHOSTINGSTARTUP", "true");
 
-builder.AddNpmApp("web", "../companycrm-web", "dev")
+builder.AddViteApp("web", "../companycrm-web")
     .WithReference(api)
     .WithHttpEndpoint(env: "PORT")
     .WithExternalHttpEndpoints()

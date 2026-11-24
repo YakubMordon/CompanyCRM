@@ -15,29 +15,29 @@
 
   <ItemGroup>
     <!-- EF Core & Relational Providers -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.11" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.11" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.11" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.15" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.15" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.15" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.4" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.15">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
 
     <!-- Background Jobs (Hangfire) -->
-    <PackageReference Include="Hangfire.Core" Version="1.8.17" />
-    <PackageReference Include="Hangfire.AspNetCore" Version="1.8.17" />
-    <PackageReference Include="Hangfire.MemoryStorage" Version="1.8.1.1" />
+    <PackageReference Include="Hangfire.Core" Version="1.8.25" />
+    <PackageReference Include="Hangfire.AspNetCore" Version="1.8.25" />
+    <PackageReference Include="Hangfire.MemoryStorage" Version="1.8.1.2" />
 
     <!-- Email Notifications -->
-    <PackageReference Include="MailKit" Version="4.8.0" />
-    <PackageReference Include="MimeKit" Version="4.8.0" />
+    <PackageReference Include="MailKit" Version="5.0.0" />
+    <PackageReference Include="MimeKit" Version="5.0.0" />
 
     <!-- Microsoft Extensions & HTTP -->
-    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.12" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
-    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.15" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.15" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.15" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.15" />
   </ItemGroup>
 
 </Project>

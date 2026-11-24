@@ -1,9 +1,9 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using CompanyCRM.Domain.Entities;
 using CompanyCRM.Domain.Enums;
 using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 namespace CompanyCRM.Api.Services;
@@ -11,6 +11,7 @@ namespace CompanyCRM.Api.Services;
 public class TokenService : ITokenService
 {
     private readonly IConfiguration _configuration;
+    private static readonly JsonWebTokenHandler _tokenHandler = new();
 
     public TokenService(IConfiguration configuration)
     {
@@ -66,8 +67,7 @@ public class TokenService : ITokenService
             SigningCredentials = credentials
         };
 
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var token = tokenHandler.CreateToken(tokenDescriptor);
-        return (tokenHandler.WriteToken(token), expiresAt);
+        var token = _tokenHandler.CreateToken(tokenDescriptor);
+        return (token, expiresAt);
     }
 }

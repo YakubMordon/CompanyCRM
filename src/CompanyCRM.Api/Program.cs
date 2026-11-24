@@ -11,7 +11,7 @@ using CompanyCRM.Infrastructure.Persistence;
 using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
+using Scalar.AspNetCore;
 
 // Sanitize Visual Studio hosting startup assemblies that fail to execute under .NET 9
 var rawHostingStartups = Environment.GetEnvironmentVariable("ASPNETCORE_HOSTINGSTARTUPASSEMBLIES");
@@ -142,38 +142,8 @@ builder.Services.AddAuthorization(options =>
         policy.RequireRole(nameof(AppRole.HigherManagement), nameof(AppRole.TeamLead)));
 });
 
-// 9. Swagger / OpenAPI Configuration
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "CompanyCRM API",
-        Version = "v1",
-        Description = "Enterprise CRM, Project Management, and Time-Tracking Web API."
-    });
-
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        Description = "JWT Authorization header using Bearer scheme. Format: 'Bearer {token}'",
-        Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.Http,
-        Scheme = "Bearer",
-        BearerFormat = "JWT"
-    });
-
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
-            },
-            Array.Empty<string>()
-        }
-    });
-});
+// 9. Modern OpenAPI Configuration
+builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
@@ -183,11 +153,11 @@ await DatabaseSeeder.SeedDemoDataAsync(app.Services);
 // 11. Middleware Pipeline
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
+    app.MapOpenApi();
+    app.MapScalarApiReference(options =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "CompanyCRM API v1");
-        c.RoutePrefix = "swagger";
+        options.WithTitle("CompanyCRM API Reference")
+               .WithTheme(ScalarTheme.Moon);
     });
 }
 

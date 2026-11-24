@@ -1,9 +1,10 @@
-import { AxiosRequestConfig } from 'axios';
-import apiClient from '../services/apiClient';
+import apiClient, { RequestConfig } from '../services/apiClient';
+
+export type AxiosRequestConfig = RequestConfig;
 
 export const customInstance = <T>(
-  config: AxiosRequestConfig,
-  options?: AxiosRequestConfig
+  config: RequestConfig,
+  options?: RequestConfig
 ): Promise<T> => {
   let url = config.url || '';
   // If url starts with /api and apiClient has baseURL ending in /api, strip /api to avoid /api/api/...
@@ -11,7 +12,7 @@ export const customInstance = <T>(
     url = url.substring(4) || '/';
   }
 
-  return apiClient({
+  return apiClient<T>({
     ...config,
     ...options,
     url,

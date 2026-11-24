@@ -20,7 +20,6 @@
     "@mui/material": "^6.4.0",
     "@mui/x-data-grid": "^7.29.0",
     "@tanstack/react-query": "^5.62.8",
-    "axios": "^1.7.9",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.3",

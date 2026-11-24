@@ -2,6 +2,7 @@ using CompanyCRM.Application.Interfaces;
 using CompanyCRM.Domain.Entities;
 using CompanyCRM.Domain.Enums;
 using CompanyCRM.Infrastructure.Persistence;
+using MailKit;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.EntityFrameworkCore;
