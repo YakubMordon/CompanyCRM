@@ -36,6 +36,11 @@ public class SyncController : ControllerBase
     public Task<ActionResult<WebhookProcessingResultDto>> ProcessJiraWebhook(CancellationToken ct) =>
         HandleInboundWebhookAsync(ExternalSourceType.Jira, ct);
 
+    [HttpPost("api/webhooks/github")]
+    [AllowAnonymous]
+    public Task<ActionResult<WebhookProcessingResultDto>> ProcessGitHubWebhook(CancellationToken ct) =>
+        HandleInboundWebhookAsync(ExternalSourceType.GitHub, ct);
+
     private async Task<ActionResult<WebhookProcessingResultDto>> HandleInboundWebhookAsync(
         ExternalSourceType source,
         CancellationToken ct)

@@ -13,7 +13,7 @@ export const ExternalSyncPage: React.FC = () => {
     return (
       <Box sx={{ p: 4, textAlign: 'center' }}>
         <Typography variant="h6" color="text.secondary">
-          Please select a project to configure Azure DevOps external sync.
+          Please select a project to configure external issue tracker sync.
         </Typography>
       </Box>
     );
@@ -26,7 +26,7 @@ export const ExternalSyncPage: React.FC = () => {
           External Synchronization & Conflict Deduplication
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Two-way Azure DevOps sync with SHA-256 loop prevention and token similarity deduplication.
+          Two-way Azure DevOps, Jira, and GitHub sync with SHA-256 loop prevention and token similarity deduplication.
         </Typography>
       </Box>
 

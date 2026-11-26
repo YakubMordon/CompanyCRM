@@ -546,7 +546,7 @@ public class SyncOrchestratorService : ISyncOrchestratorService
                 localItem!.ExternalSource = conflict.ExternalSource;
                 localItem.ExternalId = conflict.ExternalId;
                 var projectName = conflict.Project?.ExternalProjectName ?? "CompanyProject";
-                localItem.ExternalUrl = $"https://dev.azure.com/simulated-org/{projectName}/_workitems/edit/{conflict.ExternalId}";
+                localItem.ExternalUrl = BuildExternalUrl(conflict.ExternalSource, conflict.Project?.ExternalOrgUrl, projectName, conflict.ExternalId);
                 localItem.LastSyncedContentHash = SyncContentHasher.ComputeHash(
                     localItem.Title, localItem.Description, localItem.Status, localItem.Type, localItem.Assignee?.Email);
                 localItem.LastSyncOrigin = SyncOrigin.LocalCrm;
@@ -572,13 +572,11 @@ public class SyncOrchestratorService : ISyncOrchestratorService
                 var creator = await _dbContext.Employees.FirstOrDefaultAsync(ct)
                     ?? throw new InvalidOperationException("No employee found in database.");
 
-                var remoteStatus = AzureDevOpsIssueTrackerProvider.MapAdoStateToStatus(conflict.ExternalStatus);
+                var remoteStatus = MapRemoteStatus(conflict.ExternalSource, conflict.ExternalStatus);
                 var remoteType = WorkItemType.Task;
                 var hash = SyncContentHasher.ComputeHash(conflict.ExternalTitle, conflict.ExternalDescription, remoteStatus, remoteType, conflict.ExternalAssigneeEmail);
 
-                var keepBothCode = !string.IsNullOrEmpty(conflict.ExternalId) && conflict.ExternalId.StartsWith("ADO-", StringComparison.OrdinalIgnoreCase)
-                    ? conflict.ExternalId
-                    : $"ADO-{conflict.ExternalId}";
+                var keepBothCode = BuildKeepBothCode(conflict.ExternalSource, conflict.ExternalId);
 
                 var keepBothProjectName = conflict.Project?.ExternalProjectName ?? "CompanyProject";
                 var newItem = new WorkItem
@@ -594,7 +592,7 @@ public class SyncOrchestratorService : ISyncOrchestratorService
                     ReviewStatus = ReviewStatus.NotRequired,
                     ExternalSource = conflict.ExternalSource,
                     ExternalId = TruncateRequired(conflict.ExternalId, 100),
-                    ExternalUrl = TruncateNullable($"https://dev.azure.com/simulated-org/{keepBothProjectName}/_workitems/edit/{conflict.ExternalId}", 500),
+                    ExternalUrl = TruncateNullable(BuildExternalUrl(conflict.ExternalSource, conflict.Project?.ExternalOrgUrl, keepBothProjectName, conflict.ExternalId), 500),
                     LastSyncedContentHash = hash,
                     LastSyncOrigin = SyncOrigin.ExternalWebhook,
                     LastSyncedAt = DateTimeOffset.UtcNow,
@@ -737,6 +735,44 @@ public class SyncOrchestratorService : ISyncOrchestratorService
         var delimiters = new[] { ' ', '\t', '\r', '\n', '-', '_', ':', '.', ',', ';', '/', '\\', '(', ')', '[', ']' };
         return new HashSet<string>(text.Split(delimiters, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
     }
+
+    private static string BuildExternalUrl(ExternalSourceType source, string? orgUrl, string projectName, string externalId)
+    {
+        var baseUrl = orgUrl?.TrimEnd('/');
+        return source switch
+        {
+            ExternalSourceType.Jira => $"{(string.IsNullOrWhiteSpace(baseUrl) ? "https://simulated-jira.atlassian.net" : baseUrl)}/browse/{externalId}",
+            ExternalSourceType.GitHub => BuildGitHubUrl(projectName, externalId),
+            _ => $"{(string.IsNullOrWhiteSpace(baseUrl) ? "https://dev.azure.com/simulated-org" : baseUrl)}/{projectName}/_workitems/edit/{externalId}"
+        };
+    }
+
+    private static string BuildGitHubUrl(string repoName, string externalId)
+    {
+        var repo = repoName.Contains('/') ? repoName.Trim('/') : $"companycrm/{repoName.Trim('/')}";
+        var isPr = externalId.StartsWith("GH-PR-", StringComparison.OrdinalIgnoreCase);
+        var num = externalId.Replace("GH-PR-", "", StringComparison.OrdinalIgnoreCase)
+                            .Replace("GH-", "", StringComparison.OrdinalIgnoreCase);
+        return $"https://github.com/{repo}/{(isPr ? "pull" : "issues")}/{num}";
+    }
+
+    private static string BuildKeepBothCode(ExternalSourceType source, string externalId)
+    {
+        if (string.IsNullOrEmpty(externalId)) return "EXT-ITEM";
+        return source switch
+        {
+            ExternalSourceType.Jira => externalId,
+            ExternalSourceType.GitHub => externalId.StartsWith("GH-", StringComparison.OrdinalIgnoreCase) ? externalId : $"GH-{externalId}",
+            _ => externalId.StartsWith("ADO-", StringComparison.OrdinalIgnoreCase) ? externalId : $"ADO-{externalId}"
+        };
+    }
+
+    private static WorkItemStatus MapRemoteStatus(ExternalSourceType source, string? externalStatus) => source switch
+    {
+        ExternalSourceType.Jira => JiraIssueTrackerProvider.MapStatusFromJira(externalStatus ?? string.Empty),
+        ExternalSourceType.GitHub => GitHubIssueTrackerProvider.MapStatusFromGitHub(externalStatus),
+        _ => AzureDevOpsIssueTrackerProvider.MapAdoStateToStatus(externalStatus)
+    };
 
     private static SyncConflictDto ToConflictDto(SyncConflict c, WorkItem? local) => new(
         Id: c.Id,

@@ -39,10 +39,29 @@ export const ExternalConfigCard: React.FC<ExternalConfigCardProps> = ({ projectI
       .then((cfg) => {
         if (!isMounted) return;
         setConfig(cfg);
-        const resolvedSource = cfg.externalSource === 'Jira' ? 'Jira' : 'AzureDevOps';
+        const resolvedSource: ExternalSourceType =
+          cfg.externalSource === 'Jira'
+            ? 'Jira'
+            : cfg.externalSource === 'GitHub'
+            ? 'GitHub'
+            : 'AzureDevOps';
         setSourceType(resolvedSource);
-        setOrgUrl(cfg.externalOrgUrl || (resolvedSource === 'Jira' ? 'https://company.atlassian.net' : 'https://dev.azure.com/contoso-crm'));
-        setProjectName(cfg.externalProjectName || (resolvedSource === 'Jira' ? 'CRM' : 'CompanyCRM'));
+        setOrgUrl(
+          cfg.externalOrgUrl ||
+            (resolvedSource === 'Jira'
+              ? 'https://company.atlassian.net'
+              : resolvedSource === 'GitHub'
+              ? 'https://api.github.com'
+              : 'https://dev.azure.com/contoso-crm')
+        );
+        setProjectName(
+          cfg.externalProjectName ||
+            (resolvedSource === 'Jira'
+              ? 'CRM'
+              : resolvedSource === 'GitHub'
+              ? 'companycrm/platform'
+              : 'CompanyCRM')
+        );
         setPat('');
         setIsSimulatedMode(cfg.isSimulatedMode);
         setIsSyncEnabled(cfg.isSyncEnabled);
@@ -62,17 +81,24 @@ export const ExternalConfigCard: React.FC<ExternalConfigCardProps> = ({ projectI
   const handleSourceTypeChange = (newSource: ExternalSourceType) => {
     setSourceType(newSource);
     if (newSource === 'Jira') {
-      if (!orgUrl || orgUrl.includes('dev.azure.com')) {
+      if (!orgUrl || orgUrl.includes('dev.azure.com') || orgUrl.includes('github.com')) {
         setOrgUrl('https://company.atlassian.net');
       }
-      if (!projectName || projectName === 'CompanyCRM') {
+      if (!projectName || projectName === 'CompanyCRM' || projectName.includes('/')) {
         setProjectName('CRM');
       }
+    } else if (newSource === 'GitHub') {
+      if (!orgUrl || orgUrl.includes('dev.azure.com') || orgUrl.includes('atlassian.net')) {
+        setOrgUrl('https://api.github.com');
+      }
+      if (!projectName || projectName === 'CompanyCRM' || projectName === 'CRM') {
+        setProjectName('companycrm/platform');
+      }
     } else {
-      if (!orgUrl || orgUrl.includes('atlassian.net')) {
+      if (!orgUrl || orgUrl.includes('atlassian.net') || orgUrl.includes('github.com')) {
         setOrgUrl('https://dev.azure.com/contoso-crm');
       }
-      if (!projectName || projectName === 'CRM') {
+      if (!projectName || projectName === 'CRM' || projectName.includes('/')) {
         setProjectName('CompanyCRM');
       }
     }
@@ -97,7 +123,13 @@ export const ExternalConfigCard: React.FC<ExternalConfigCardProps> = ({ projectI
 
       const updated = await projectsApi.updateExternalConfig(projectId, dto);
       setConfig(updated);
-      setSaveSuccess(`${sourceType === 'Jira' ? 'Jira' : 'Azure DevOps'} configuration saved successfully.`);
+      const providerLabel =
+        sourceType === 'Jira'
+          ? 'Jira'
+          : sourceType === 'GitHub'
+          ? 'GitHub'
+          : 'Azure DevOps';
+      setSaveSuccess(`${providerLabel} configuration saved successfully.`);
     } catch (err: any) {
       setSaveError(err?.response?.data?.detail || err?.message || 'Failed to save configuration.');
     } finally {
@@ -114,13 +146,18 @@ export const ExternalConfigCard: React.FC<ExternalConfigCardProps> = ({ projectI
   }
 
   const isJira = sourceType === 'Jira';
+  const isGitHub = sourceType === 'GitHub';
 
   return (
     <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
         <CloudQueueIcon color="primary" />
         <Typography variant="h6" sx={{ fontWeight: 700 }}>
-          {isJira ? 'Jira Cloud / Data Center Provider' : 'Azure DevOps Integration Provider'}
+          {isJira
+            ? 'Jira Cloud / Data Center Provider'
+            : isGitHub
+            ? 'GitHub Issues & Pull Requests Provider'
+            : 'Azure DevOps Integration Provider'}
         </Typography>
       </Box>
 
@@ -152,7 +189,7 @@ export const ExternalConfigCard: React.FC<ExternalConfigCardProps> = ({ projectI
                     Simulated Sandbox Mode ({isSimulatedMode ? 'ACTIVE' : 'LIVE API'})
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Runs deterministic offline {isJira ? 'Jira' : 'Azure DevOps'} sync with realistic work items, mock
+                    Runs deterministic offline {isJira ? 'Jira' : isGitHub ? 'GitHub' : 'Azure DevOps'} sync with realistic work items, mock
                     webhooks, and conflict deduplication locally without needing live credentials.
                   </Typography>
                 </Box>
@@ -171,11 +208,18 @@ export const ExternalConfigCard: React.FC<ExternalConfigCardProps> = ({ projectI
             >
               <MenuItem value="AzureDevOps">Azure DevOps Boards</MenuItem>
               <MenuItem value="Jira">Atlassian Jira (Cloud / Data Center)</MenuItem>
+              <MenuItem value="GitHub">GitHub Issues &amp; Pull Requests</MenuItem>
             </TextField>
 
             <TextField
               size="small"
-              label={isJira ? 'Jira Host URL (e.g. https://your-domain.atlassian.net)' : 'Azure DevOps Organization URL'}
+              label={
+                isJira
+                  ? 'Jira Host URL (e.g. https://your-domain.atlassian.net)'
+                  : isGitHub
+                  ? 'GitHub API Base URL (e.g. https://api.github.com)'
+                  : 'Azure DevOps Organization URL'
+              }
               value={orgUrl}
               onChange={(e) => setOrgUrl(e.target.value)}
               sx={{ flexGrow: 1, minWidth: 260 }}
@@ -184,7 +228,13 @@ export const ExternalConfigCard: React.FC<ExternalConfigCardProps> = ({ projectI
 
             <TextField
               size="small"
-              label={isJira ? 'Jira Project Key (e.g. CRM)' : 'Project Name'}
+              label={
+                isJira
+                  ? 'Jira Project Key (e.g. CRM)'
+                  : isGitHub
+                  ? 'Repository (owner/repo)'
+                  : 'Project Name'
+              }
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
               sx={{ minWidth: 180 }}
