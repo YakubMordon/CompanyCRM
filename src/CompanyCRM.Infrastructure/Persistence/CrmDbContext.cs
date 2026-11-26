@@ -24,6 +24,7 @@ public class CrmDbContext : DbContext
     public DbSet<DailyPlanReminderLog> DailyPlanReminderLogs => Set<DailyPlanReminderLog>();
     public DbSet<SyncConflict> SyncConflicts => Set<SyncConflict>();
     public DbSet<EmailNotificationLog> EmailNotificationLogs => Set<EmailNotificationLog>();
+    public DbSet<ChatWebhookConfig> ChatWebhookConfigs => Set<ChatWebhookConfig>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

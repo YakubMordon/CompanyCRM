@@ -90,8 +90,13 @@ public static class ServiceCollectionExtensions
         // 6. Management Analytics Service
         services.AddScoped<IManagementAnalyticsService, ManagementAnalyticsService>();
 
-        // 7. Email Notifications (MailKit with MailPit SMTP & In-App DB log)
+        // 7. Email Notifications (MailKit with MailPit SMTP & In-App DB log) & Chat Webhooks (Slack / Teams)
         services.AddScoped<IEmailNotificationService, MailKitEmailNotificationService>();
+        services.AddHttpClient<SlackTeamsWebhookNotificationService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+        });
+        services.AddScoped<IChatWebhookNotificationService>(sp => sp.GetRequiredService<SlackTeamsWebhookNotificationService>());
 
         // 8. Background Jobs & Hangfire Configuration
         services.AddScoped<IPlanningCutoffJob, DailyPlanCutoffReminderJob>();

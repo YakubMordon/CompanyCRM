@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { useProject } from '../contexts/ProjectContext';
 import { ExternalConfigCard } from '../components/sync/ExternalConfigCard';
+import { ChatWebhookConfigCard } from '../components/sync/ChatWebhookConfigCard';
 import { SyncLogFeed } from '../components/sync/SyncLogFeed';
 import { ConflictResolver } from '../components/sync/ConflictResolver';
 
@@ -32,6 +33,9 @@ export const ExternalSyncPage: React.FC = () => {
 
       {/* Provider Configuration */}
       <ExternalConfigCard projectId={activeProject.id} />
+
+      {/* Slack & Microsoft Teams Alerts */}
+      <ChatWebhookConfigCard projectId={activeProject.id} />
 
       {/* Sync Operations & Live Feed */}
       <SyncLogFeed projectId={activeProject.id} />

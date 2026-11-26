@@ -12,15 +12,18 @@ public class WorkItemReviewService : IWorkItemReviewService
     private readonly CrmDbContext _dbContext;
     private readonly IEmailNotificationService _emailNotificationService;
     private readonly ISyncOrchestratorService _syncOrchestrator;
+    private readonly IChatWebhookNotificationService? _chatWebhookService;
 
     public WorkItemReviewService(
         CrmDbContext dbContext,
         IEmailNotificationService emailNotificationService,
-        ISyncOrchestratorService syncOrchestrator)
+        ISyncOrchestratorService syncOrchestrator,
+        IChatWebhookNotificationService? chatWebhookService = null)
     {
         _dbContext = dbContext;
         _emailNotificationService = emailNotificationService;
         _syncOrchestrator = syncOrchestrator;
+        _chatWebhookService = chatWebhookService;
     }
 
     public async Task<WorkItemDto> AssignReviewerAsync(Guid workItemId, Guid reviewerId, CancellationToken ct = default)
@@ -59,6 +62,17 @@ public class WorkItemReviewService : IWorkItemReviewService
             item.Title,
             item.Id,
             ct);
+
+        if (_chatWebhookService != null)
+        {
+            await _chatWebhookService.SendReviewAssignedAlertAsync(
+                reviewer.FullName,
+                item.Code,
+                item.Title,
+                item.Id,
+                item.ProjectId,
+                ct);
+        }
 
         return ToDto(item);
     }

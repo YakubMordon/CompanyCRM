@@ -40,6 +40,7 @@ public class DailyPlanCutoffReminderJob : IPlanningCutoffJob
         using var scope = _scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
         var emailService = scope.ServiceProvider.GetRequiredService<IEmailNotificationService>();
+        var chatWebhookService = scope.ServiceProvider.GetService<IChatWebhookNotificationService>();
 
         // 1. Retrieve Cutoff Config (project-specific override if requested, falling back to global ProjectId == null)
         PlanningCutoffConfig? config = null;
@@ -235,6 +236,17 @@ public class DailyPlanCutoffReminderJob : IPlanningCutoffJob
                     await dbContext.SaveChangesAsync(ct);
 
                     notifiedEmails.Add(employee.Email);
+
+                    if (chatWebhookService != null)
+                    {
+                        await chatWebhookService.SendCutoffReminderAlertAsync(
+                            employee.FullName,
+                            employee.Email,
+                            localDate,
+                            config.CutoffTimeLocal,
+                            projectId,
+                            ct);
+                    }
                 }
                 catch (Exception ex)
                 {
