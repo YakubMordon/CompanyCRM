@@ -12,6 +12,7 @@ import Tooltip from '@mui/material/Tooltip';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import InsightsIcon from '@mui/icons-material/Insights';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import { useAuth } from '../contexts/AuthContext';
 import { useProject } from '../contexts/ProjectContext';
 import { ForbiddenView } from '../components/management/ForbiddenView';
@@ -21,6 +22,7 @@ import { VelocityChart } from '../components/management/VelocityChart';
 import { HoursComparisonChart } from '../components/management/HoursComparisonChart';
 import { CompletionRatesChart } from '../components/management/CompletionRatesChart';
 import { BurndownChart } from '../components/management/BurndownChart';
+import { InvoicesTab } from '../components/management/InvoicesTab';
 
 export const ManagementPortalPage: React.FC = () => {
   const { role } = useAuth();
@@ -102,6 +104,12 @@ export const ManagementPortalPage: React.FC = () => {
             label="Analytics & Delivery Charts"
             sx={{ fontWeight: 600 }}
           />
+          <Tab
+            icon={<ReceiptLongIcon />}
+            iconPosition="start"
+            label="Invoices & Billing"
+            sx={{ fontWeight: 600 }}
+          />
         </Tabs>
       </Box>
 
@@ -128,6 +136,8 @@ export const ManagementPortalPage: React.FC = () => {
           </Grid>
         </Grid>
       )}
+
+      {activeTab === 3 && <InvoicesTab projectId={effectiveProjectId} />}
     </Box>
   );
 };

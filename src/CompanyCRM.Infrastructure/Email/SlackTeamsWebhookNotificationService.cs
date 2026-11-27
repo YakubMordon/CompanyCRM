@@ -11,22 +11,11 @@ using Microsoft.Extensions.Logging;
 
 namespace CompanyCRM.Infrastructure.Email;
 
-public class SlackTeamsWebhookNotificationService : IChatWebhookNotificationService
+public class SlackTeamsWebhookNotificationService(
+    HttpClient httpClient,
+    IServiceScopeFactory scopeFactory,
+    ILogger<SlackTeamsWebhookNotificationService> logger) : IChatWebhookNotificationService
 {
-    private readonly HttpClient _httpClient;
-    private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ILogger<SlackTeamsWebhookNotificationService> _logger;
-
-    public SlackTeamsWebhookNotificationService(
-        HttpClient httpClient,
-        IServiceScopeFactory scopeFactory,
-        ILogger<SlackTeamsWebhookNotificationService> logger)
-    {
-        _httpClient = httpClient;
-        _scopeFactory = scopeFactory;
-        _logger = logger;
-    }
-
     public async Task SendCutoffReminderAlertAsync(
         string employeeName,
         string employeeEmail,
@@ -85,7 +74,12 @@ public class SlackTeamsWebhookNotificationService : IChatWebhookNotificationServ
         var summary = $"{creatorName}'s work item '{workItemTitle}' ({workItemCode}) was marked {statusLabel}."
             + (string.IsNullOrWhiteSpace(comment) ? string.Empty : $" Note: {comment}");
 
-        var severity = status == ReviewStatus.Denied ? "danger" : status == ReviewStatus.Approved ? "good" : "warning";
+        var severity = status switch
+        {
+            ReviewStatus.Denied => "danger",
+            ReviewStatus.Approved => "good",
+            _ => "warning"
+        };
         await DispatchAsync(config, title, summary, severity, ct);
     }
 
@@ -122,7 +116,7 @@ public class SlackTeamsWebhookNotificationService : IChatWebhookNotificationServ
         UpdateChatWebhookConfigDto request,
         CancellationToken ct = default)
     {
-        using var scope = _scopeFactory.CreateScope();
+        using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
 
         var config = await dbContext.ChatWebhookConfigs
@@ -182,16 +176,19 @@ public class SlackTeamsWebhookNotificationService : IChatWebhookNotificationServ
             "good",
             ct);
 
+        var slackStatus = slackOk ? "OK" : "Skipped/Failed";
+        var teamsStatus = teamsOk ? "OK" : "Skipped/Failed";
+
         var message = config.IsSimulatedMode
             ? "Simulated Slack & Microsoft Teams test alert logged (no external HTTP calls made)."
-            : $"Test alert dispatched (Slack: {(slackOk ? "OK" : "Skipped/Failed")}, Teams: {(teamsOk ? "OK" : "Skipped/Failed")}).";
+            : $"Test alert dispatched (Slack: {slackStatus}, Teams: {teamsStatus}).";
 
         return new ChatWebhookTestResultDto(slackOk, teamsOk, config.IsSimulatedMode, message);
     }
 
     private async Task<ChatWebhookConfig?> ResolveConfigAsync(Guid? projectId, CancellationToken ct)
     {
-        using var scope = _scopeFactory.CreateScope();
+        using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<CrmDbContext>();
 
         ChatWebhookConfig? config = null;
@@ -221,7 +218,7 @@ public class SlackTeamsWebhookNotificationService : IChatWebhookNotificationServ
 
         if (config.IsSimulatedMode)
         {
-            _logger.LogInformation(
+            logger.LogInformation(
                 "[Simulated Chat Webhook] {Title} | SlackPayload={SlackPayload} | TeamsPayload={TeamsPayload}",
                 title, slackPayload, teamsPayload);
             return (true, true);
@@ -247,17 +244,17 @@ public class SlackTeamsWebhookNotificationService : IChatWebhookNotificationServ
         try
         {
             using var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-            using var response = await _httpClient.PostAsync(url, content, ct);
+            using var response = await httpClient.PostAsync(url, content, ct);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("{Channel} webhook returned {StatusCode}", channelName, response.StatusCode);
+                logger.LogWarning("{Channel} webhook returned {StatusCode}", channelName, response.StatusCode);
                 return false;
             }
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to dispatch {Channel} webhook", channelName);
+            logger.LogWarning(ex, "Failed to dispatch {Channel} webhook", channelName);
             return false;
         }
     }

@@ -25,6 +25,8 @@ public class CrmDbContext : DbContext
     public DbSet<SyncConflict> SyncConflicts => Set<SyncConflict>();
     public DbSet<EmailNotificationLog> EmailNotificationLogs => Set<EmailNotificationLog>();
     public DbSet<ChatWebhookConfig> ChatWebhookConfigs => Set<ChatWebhookConfig>();
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<InvoiceLineItem> InvoiceLineItems => Set<InvoiceLineItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

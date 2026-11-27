@@ -87,8 +87,9 @@ public static class ServiceCollectionExtensions
         // 5. Work Item Review Service
         services.AddScoped<IWorkItemReviewService, WorkItemReviewService>();
 
-        // 6. Management Analytics Service
+        // 6. Management Analytics & Invoicing Services
         services.AddScoped<IManagementAnalyticsService, ManagementAnalyticsService>();
+        services.AddScoped<IInvoiceService, InvoiceService>();
 
         // 7. Email Notifications (MailKit with MailPit SMTP & In-App DB log) & Chat Webhooks (Slack / Teams)
         services.AddScoped<IEmailNotificationService, MailKitEmailNotificationService>();
@@ -102,6 +103,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPlanningCutoffJob, DailyPlanCutoffReminderJob>();
         services.AddScoped<DailyPlanCutoffReminderJob>();
         services.AddScoped<ExternalSyncReconciliationJob>();
+        services.AddScoped<MonthlyInvoiceGenerationJob>();
 
         services.AddHangfire((sp, hangfireConfig) =>
         {

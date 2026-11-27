@@ -189,6 +189,11 @@ if (!app.Environment.IsEnvironment("Testing"))
             "daily-plan-cutoff-reminder",
             job => job.ExecuteCutoffCheckAsync(CancellationToken.None),
             "*/15 * * * *");
+
+        RecurringJob.AddOrUpdate<MonthlyInvoiceGenerationJob>(
+            "monthly-invoice-generation",
+            job => job.ExecutePreviousMonthAsync(CancellationToken.None),
+            "0 2 1 * *");
     }
     catch (Exception ex)
     {

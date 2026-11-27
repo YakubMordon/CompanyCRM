@@ -6,6 +6,7 @@ export interface RequestConfig {
   data?: any;
   headers?: Record<string, string>;
   signal?: AbortSignal;
+  responseType?: 'json' | 'text' | 'blob';
 }
 
 export interface ApiResponse<T = any> {
@@ -90,7 +91,9 @@ export async function apiClient<T = any>(config: RequestConfig): Promise<ApiResp
   let responseData: any = null;
   const contentType = res.headers.get('content-type') || '';
   if (res.status !== 204) {
-    if (contentType.includes('application/json')) {
+    if (config.responseType === 'blob') {
+      responseData = await res.blob().catch(() => null);
+    } else if (contentType.includes('application/json')) {
       responseData = await res.json().catch(() => null);
     } else {
       responseData = await res.text().catch(() => null);
@@ -143,6 +146,9 @@ apiClient.post = <T = any>(url: string, data?: any, config?: RequestConfig) =>
 
 apiClient.put = <T = any>(url: string, data?: any, config?: RequestConfig) =>
   apiClient<T>({ ...config, url, data, method: 'PUT' });
+
+apiClient.patch = <T = any>(url: string, data?: any, config?: RequestConfig) =>
+  apiClient<T>({ ...config, url, data, method: 'PATCH' });
 
 apiClient.delete = <T = any>(url: string, config?: RequestConfig) =>
   apiClient<T>({ ...config, url, method: 'DELETE' });
