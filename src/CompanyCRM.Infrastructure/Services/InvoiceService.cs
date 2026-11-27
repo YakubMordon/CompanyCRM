@@ -24,13 +24,13 @@ public class InvoiceService(CrmDbContext dbContext) : IInvoiceService
         if (year.HasValue) query = query.Where(i => i.Year == year.Value);
         if (month.HasValue) query = query.Where(i => i.Month == month.Value);
 
-        var invoices = await query
+        var invoices = await query.ToListAsync(ct);
+
+        return [.. invoices
             .OrderByDescending(i => i.Year)
             .ThenByDescending(i => i.Month)
             .ThenByDescending(i => i.GeneratedAt)
-            .ToListAsync(ct);
-
-        return [.. invoices.Select(ToDto)];
+            .Select(ToDto)];
     }
 
     public async Task<InvoiceDto?> GetInvoiceByIdAsync(Guid invoiceId, CancellationToken ct = default)
@@ -203,7 +203,7 @@ public class InvoiceService(CrmDbContext dbContext) : IInvoiceService
         return (pdfBytes, fileName);
     }
 
-    private static InvoiceDto ToDto(Invoice i) => new(
+    internal static InvoiceDto ToDto(Invoice i) => new(
         i.Id,
         i.InvoiceNumber,
         i.ProjectId,
@@ -227,5 +227,10 @@ public class InvoiceService(CrmDbContext dbContext) : IInvoiceService
             li.Description,
             li.Hours,
             li.HourlyRate,
-            li.Amount))]);
+            li.Amount))],
+        i.StripeCheckoutSessionId,
+        i.StripePaymentUrl,
+        i.PaidAt,
+        i.LastExportedProvider,
+        i.LastExportedAt);
 }

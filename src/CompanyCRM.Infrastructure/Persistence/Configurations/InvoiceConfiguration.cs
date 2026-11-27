@@ -35,6 +35,11 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.Property(i => i.TotalAmount)
             .HasPrecision(18, 2);
 
+        builder.Property(i => i.StripeCheckoutSessionId).HasMaxLength(200);
+        builder.Property(i => i.StripePaymentIntentId).HasMaxLength(200);
+        builder.Property(i => i.StripePaymentUrl).HasMaxLength(1000);
+        builder.Property(i => i.LastExportedProvider).HasMaxLength(50);
+
         builder.HasIndex(i => new { i.ProjectId, i.Year, i.Month })
             .IsUnique()
             .HasDatabaseName("IX_Invoices_ProjectId_Year_Month");

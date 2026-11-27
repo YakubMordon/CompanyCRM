@@ -30,6 +30,14 @@ public class Invoice
     public DateTimeOffset GeneratedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateOnly DueDate { get; set; }
 
+    // Stripe Billing & Accounting Export tracking
+    public string? StripeCheckoutSessionId { get; set; }
+    public string? StripePaymentIntentId { get; set; }
+    public string? StripePaymentUrl { get; set; }
+    public DateTimeOffset? PaidAt { get; set; }
+    public string? LastExportedProvider { get; set; }
+    public DateTimeOffset? LastExportedAt { get; set; }
+
     public ICollection<InvoiceLineItem> LineItems { get; set; } = new List<InvoiceLineItem>();
 }
 

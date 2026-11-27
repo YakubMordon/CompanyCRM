@@ -13,6 +13,7 @@ import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import InsightsIcon from '@mui/icons-material/Insights';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import { useAuth } from '../contexts/AuthContext';
 import { useProject } from '../contexts/ProjectContext';
 import { ForbiddenView } from '../components/management/ForbiddenView';
@@ -23,6 +24,7 @@ import { HoursComparisonChart } from '../components/management/HoursComparisonCh
 import { CompletionRatesChart } from '../components/management/CompletionRatesChart';
 import { BurndownChart } from '../components/management/BurndownChart';
 import { InvoicesTab } from '../components/management/InvoicesTab';
+import { RetainersTab } from '../components/management/RetainersTab';
 
 export const ManagementPortalPage: React.FC = () => {
   const { role } = useAuth();
@@ -110,6 +112,12 @@ export const ManagementPortalPage: React.FC = () => {
             label="Invoices & Billing"
             sx={{ fontWeight: 600 }}
           />
+          <Tab
+            icon={<AccountBalanceWalletIcon />}
+            iconPosition="start"
+            label="Retainers & Budgets"
+            sx={{ fontWeight: 600 }}
+          />
         </Tabs>
       </Box>
 
@@ -138,6 +146,8 @@ export const ManagementPortalPage: React.FC = () => {
       )}
 
       {activeTab === 3 && <InvoicesTab projectId={effectiveProjectId} />}
+
+      {activeTab === 4 && <RetainersTab projectId={effectiveProjectId} />}
     </Box>
   );
 };

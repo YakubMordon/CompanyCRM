@@ -30,7 +30,7 @@ public class SlackTeamsWebhookNotificationService(
         var title = "Daily Plan Cutoff Reminder";
         var summary = $"{employeeName} ({employeeEmail}) has not submitted a daily plan for {planDate:yyyy-MM-dd} (cutoff {cutoffTime:HH:mm}).";
 
-        await DispatchAsync(config, title, summary, "warning", ct);
+        await DispatchAsync(config, title, summary, ReviewStatusResult.Warning, ct);
     }
 
     public async Task SendReviewAssignedAlertAsync(
@@ -76,11 +76,34 @@ public class SlackTeamsWebhookNotificationService(
 
         var severity = status switch
         {
-            ReviewStatus.Denied => "danger",
-            ReviewStatus.Approved => "good",
-            _ => "warning"
+            ReviewStatus.Denied => ReviewStatusResult.Danger,
+            ReviewStatus.Approved => ReviewStatusResult.Good,
+            _ => ReviewStatusResult.Warning
         };
         await DispatchAsync(config, title, summary, severity, ct);
+    }
+
+    public async Task SendBudgetOverageAlertAsync(
+        string projectCode,
+        string projectName,
+        string clientName,
+        decimal utilizationPercent,
+        decimal loggedAmount,
+        decimal budgetAmount,
+        string currency,
+        bool isExceeded,
+        Guid projectId,
+        CancellationToken ct = default)
+    {
+        var config = await ResolveConfigAsync(projectId, ct);
+        if (config == null) return;
+
+        var title = isExceeded
+            ? $"Budget Overage Alarm: {projectCode}"
+            : $"Budget Warning Threshold: {projectCode}";
+        var summary = $"{projectName} ({clientName}) has reached {utilizationPercent:0.0}% of its monthly retainer ({loggedAmount:N2} / {budgetAmount:N2} {currency}).";
+
+        await DispatchAsync(config, title, summary, isExceeded ? ReviewStatusResult.Danger : ReviewStatusResult.Warning, ct);
     }
 
     public async Task<ChatWebhookConfigDto> GetConfigAsync(
@@ -173,7 +196,7 @@ public class SlackTeamsWebhookNotificationService(
             config,
             "CompanyCRM Test Alert",
             "This is a test notification from CompanyCRM Slack & Microsoft Teams webhook integration.",
-            "good",
+            ReviewStatusResult.Good,
             ct);
 
         var slackStatus = slackOk ? "OK" : "Skipped/Failed";
@@ -285,9 +308,9 @@ public class SlackTeamsWebhookNotificationService(
     {
         var themeColor = severity switch
         {
-            "danger" => "D13438",
-            "warning" => "FFB900",
-            "good" => "107C10",
+            ReviewStatusResult.Danger => "D13438",
+            ReviewStatusResult.Warning => "FFB900",
+            ReviewStatusResult.Good => "107C10",
             _ => "0078D7"
         };
 

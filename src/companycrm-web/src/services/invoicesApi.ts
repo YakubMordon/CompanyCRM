@@ -30,7 +30,21 @@ export interface InvoiceDto {
   generatedAt: string;
   dueDate: string;
   lineItems: InvoiceLineItemDto[];
+  stripeCheckoutSessionId?: string | null;
+  stripePaymentUrl?: string | null;
+  paidAt?: string | null;
+  lastExportedProvider?: string | null;
+  lastExportedAt?: string | null;
 }
+
+export interface StripeCheckoutSessionDto {
+  invoiceId: string;
+  sessionId: string;
+  checkoutUrl: string;
+  isSimulated: boolean;
+}
+
+export type AccountingExportFormat = 'XeroCsv' | 'QuickBooksCsv' | 'QuickBooksIif';
 
 export interface GenerateInvoicesRequestDto {
   year: number;
@@ -67,6 +81,37 @@ export const invoicesApi = {
     const link = document.createElement('a');
     link.href = url;
     link.setAttribute('download', `${invoiceNumber}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  createStripeCheckout: async (id: string): Promise<StripeCheckoutSessionDto> => {
+    const response = await apiClient.post<StripeCheckoutSessionDto>(`/invoices/${id}/stripe/checkout`, {});
+    return response.data;
+  },
+
+  simulateStripePayment: async (id: string): Promise<InvoiceDto> => {
+    const response = await apiClient.post<InvoiceDto>(`/invoices/${id}/stripe/simulate-payment`);
+    return response.data;
+  },
+
+  exportInvoices: async (
+    format: AccountingExportFormat,
+    params?: { projectId?: string; year?: number; month?: number }
+  ): Promise<void> => {
+    const response = await apiClient.post<Blob>(
+      '/invoices/export',
+      { format, ...params },
+      { responseType: 'blob' }
+    );
+    const ext = format === 'QuickBooksIif' ? 'iif' : 'csv';
+    const prefix = format.startsWith('Xero') ? 'xero' : 'quickbooks';
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `companycrm-${prefix}-invoices.${ext}`);
     document.body.appendChild(link);
     link.click();
     link.remove();

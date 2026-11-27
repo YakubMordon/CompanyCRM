@@ -29,7 +29,12 @@ public record InvoiceDto(
     string Currency,
     DateTimeOffset GeneratedAt,
     DateOnly DueDate,
-    IReadOnlyList<InvoiceLineItemDto> LineItems
+    IReadOnlyList<InvoiceLineItemDto> LineItems,
+    string? StripeCheckoutSessionId = null,
+    string? StripePaymentUrl = null,
+    DateTimeOffset? PaidAt = null,
+    string? LastExportedProvider = null,
+    DateTimeOffset? LastExportedAt = null
 );
 
 public record GenerateInvoicesRequestDto(
@@ -41,4 +46,30 @@ public record GenerateInvoicesRequestDto(
 
 public record UpdateInvoiceStatusDto(
     InvoiceStatus Status
+);
+
+public record CreateStripeCheckoutRequestDto(
+    string? SuccessUrl = null,
+    string? CancelUrl = null
+);
+
+public record StripeCheckoutSessionDto(
+    Guid InvoiceId,
+    string SessionId,
+    string CheckoutUrl,
+    bool IsSimulated
+);
+
+public enum AccountingExportFormat
+{
+    XeroCsv = 0,
+    QuickBooksCsv = 1,
+    QuickBooksIif = 2
+}
+
+public record AccountingExportRequestDto(
+    AccountingExportFormat Format,
+    Guid? ProjectId = null,
+    int? Year = null,
+    int? Month = null
 );

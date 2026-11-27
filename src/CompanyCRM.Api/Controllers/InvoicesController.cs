@@ -8,7 +8,10 @@ namespace CompanyCRM.Api.Controllers;
 [ApiController]
 [Route("api/invoices")]
 [Authorize(Policy = "HigherManagement")]
-public class InvoicesController(IInvoiceService invoiceService) : ControllerBase
+public class InvoicesController(
+    IInvoiceService invoiceService,
+    IStripeBillingService stripeBillingService,
+    IAccountingExportService accountingExportService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<InvoiceDto>>> GetInvoices(
@@ -73,5 +76,59 @@ public class InvoicesController(IInvoiceService invoiceService) : ControllerBase
         {
             return NotFound(new { message = ex.Message });
         }
+    }
+
+    [HttpPost("{id:guid}/stripe/checkout")]
+    public async Task<ActionResult<StripeCheckoutSessionDto>> CreateStripeCheckout(
+        [FromRoute] Guid id,
+        [FromBody] CreateStripeCheckoutRequestDto? request = null,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var session = await stripeBillingService.CreateCheckoutSessionAsync(
+                id,
+                request?.SuccessUrl,
+                request?.CancelUrl,
+                ct);
+            return Ok(session);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("{id:guid}/stripe/simulate-payment")]
+    public async Task<ActionResult<InvoiceDto>> SimulateStripePayment(
+        [FromRoute] Guid id,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var updated = await stripeBillingService.SimulatePaymentAsync(id, ct);
+            return Ok(updated);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("export")]
+    public async Task<IActionResult> ExportInvoices(
+        [FromBody] AccountingExportRequestDto request,
+        CancellationToken ct = default)
+    {
+        var (fileBytes, contentType, fileName) = await accountingExportService.ExportInvoicesAsync(request, ct);
+        return File(fileBytes, contentType, fileName);
     }
 }

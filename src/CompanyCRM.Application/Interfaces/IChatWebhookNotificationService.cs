@@ -41,4 +41,16 @@ public interface IChatWebhookNotificationService
     Task<ChatWebhookTestResultDto> SendTestAlertAsync(
         Guid? projectId = null,
         CancellationToken ct = default);
+
+    Task SendBudgetOverageAlertAsync(
+        string projectCode,
+        string projectName,
+        string clientName,
+        decimal utilizationPercent,
+        decimal loggedAmount,
+        decimal budgetAmount,
+        string currency,
+        bool isExceeded,
+        Guid projectId,
+        CancellationToken ct = default);
 }

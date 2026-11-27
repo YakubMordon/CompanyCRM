@@ -81,6 +81,13 @@ public enum ReviewStatus
     Denied = 4
 }
 
+public static class ReviewStatusResult
+{
+    public const string Good = "good";
+    public const string Danger = "danger";
+    public const string Warning = "warning";
+}
+
 /// <summary>
 /// External issue tracker provider type.
 /// </summary>

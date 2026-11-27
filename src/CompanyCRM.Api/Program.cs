@@ -194,6 +194,11 @@ if (!app.Environment.IsEnvironment("Testing"))
             "monthly-invoice-generation",
             job => job.ExecutePreviousMonthAsync(CancellationToken.None),
             "0 2 1 * *");
+
+        RecurringJob.AddOrUpdate<BudgetOverageMonitorJob>(
+            "budget-overage-monitor",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "0 * * * *");
     }
     catch (Exception ex)
     {

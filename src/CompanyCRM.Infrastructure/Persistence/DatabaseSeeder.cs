@@ -817,6 +817,33 @@ public class DatabaseSeeder
             }
         );
 
+        _context.ClientRetainers.AddRange(
+            new ClientRetainer
+            {
+                ProjectId = projectCrm.Id,
+                ClientName = "Acme Global Enterprise",
+                MonthlyRetainerHours = 160m,
+                MonthlyBudgetAmount = 24000m,
+                Currency = "USD",
+                WarningThresholdPercent = 80m,
+                IsActive = true,
+                NotifySlackTeams = true,
+                NotifyEmail = true
+            },
+            new ClientRetainer
+            {
+                ProjectId = projectFin.Id,
+                ClientName = "Northstar Financial",
+                MonthlyRetainerHours = 80m,
+                MonthlyBudgetAmount = 12000m,
+                Currency = "USD",
+                WarningThresholdPercent = 75m,
+                IsActive = true,
+                NotifySlackTeams = true,
+                NotifyEmail = true
+            }
+        );
+
         await _context.SaveChangesAsync(ct);
         _logger.LogInformation("Database successfully seeded with demo dataset!");
     }

@@ -26,7 +26,14 @@ import CircularProgress from '@mui/material/CircularProgress';
 import DownloadIcon from '@mui/icons-material/Download';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { invoicesApi, InvoiceDto, InvoiceStatus } from '../../services/invoicesApi';
+import PaymentIcon from '@mui/icons-material/Payment';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import {
+  invoicesApi,
+  InvoiceDto,
+  InvoiceStatus,
+  AccountingExportFormat,
+} from '../../services/invoicesApi';
 
 interface InvoicesTabProps {
   projectId?: string;
@@ -174,13 +181,43 @@ export const InvoicesTab: React.FC<InvoicesTabProps> = ({ projectId }) => {
           </FormControl>
         </Box>
 
-        <Button
-          variant="contained"
-          startIcon={<ReceiptLongIcon />}
-          onClick={() => setGenOpen(true)}
-        >
-          Generate Monthly Invoices
-        </Button>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<FileDownloadIcon />}
+            onClick={() =>
+              invoicesApi.exportInvoices('XeroCsv', {
+                projectId: projectId || undefined,
+                year: filterYear === '' ? undefined : filterYear,
+                month: filterMonth === '' ? undefined : filterMonth,
+              })
+            }
+          >
+            Xero CSV
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<FileDownloadIcon />}
+            onClick={() =>
+              invoicesApi.exportInvoices('QuickBooksIif', {
+                projectId: projectId || undefined,
+                year: filterYear === '' ? undefined : filterYear,
+                month: filterMonth === '' ? undefined : filterMonth,
+              })
+            }
+          >
+            QuickBooks IIF
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<ReceiptLongIcon />}
+            onClick={() => setGenOpen(true)}
+          >
+            Generate Monthly Invoices
+          </Button>
+        </Box>
       </Paper>
 
       {error && <Alert severity="error">{error}</Alert>}
@@ -254,6 +291,25 @@ export const InvoicesTab: React.FC<InvoicesTabProps> = ({ projectId }) => {
                     </Select>
                   </TableCell>
                   <TableCell align="right">
+                    {inv.status !== 'Paid' && inv.status !== 'Void' && (
+                      <Tooltip title="Pay via Stripe (Simulated)">
+                        <IconButton
+                          size="small"
+                          color="success"
+                          onClick={async () => {
+                            try {
+                              await invoicesApi.createStripeCheckout(inv.id);
+                              const paid = await invoicesApi.simulateStripePayment(inv.id);
+                              setInvoices((prev) => prev.map((x) => (x.id === inv.id ? paid : x)));
+                            } catch (err: any) {
+                              setError(err?.message || 'Stripe payment failed.');
+                            }
+                          }}
+                        >
+                          <PaymentIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                     <Tooltip title="View Line Items">
                       <IconButton size="small" onClick={() => setSelectedInvoice(inv)}>
                         <VisibilityIcon fontSize="small" />
